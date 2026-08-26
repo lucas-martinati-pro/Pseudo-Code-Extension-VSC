@@ -27,6 +27,16 @@
     ],
     "description": "Crée une structure de fonction complète avec lexique."
   },
+  "Procédure (fonction sans retour)": {
+    "prefix": "procedure",
+    "body": [
+      "Fonction ${1:nomProcedure}(${2:paramètres})",
+      "Début",
+      "\t$0",
+      "Fin"
+    ],
+    "description": "Crée une procédure (fonction sans valeur de retour)."
+  },
   "Boucle Pour": {
     "prefix": "pour",
     "body": [
@@ -35,6 +45,15 @@
       "fpour"
     ],
     "description": "Crée une boucle Pour."
+  },
+  "Boucle Pour décroissant": {
+    "prefix": "pourdec",
+    "body": [
+      "Pour ${1:i} de ${2:fin} à ${3:début} décroissant Faire :",
+      "\t$0",
+      "fpour"
+    ],
+    "description": "Crée une boucle Pour décroissante."
   },
   "Boucle Tant que": {
     "prefix": "tantque",
@@ -64,5 +83,53 @@
       "fsi"
     ],
     "description": "Crée une structure conditionnelle Si/Alors/Sinon."
+  },
+  "Structure Si/Sinon si/Sinon": {
+    "prefix": "sicomplet",
+    "body": [
+      "Si ${1:condition1} Alors :",
+      "\t${2:/* instructions */}",
+      "Sinon si ${3:condition2} Alors :",
+      "\t${4:/* instructions */}",
+      "Sinon :",
+      "\t${5:/* instructions */}",
+      "fsi"
+    ],
+    "description": "Crée une structure conditionnelle complète Si/Sinon si/Sinon."
+  },
+  "Écrire (affichage)": {
+    "prefix": "ecrire",
+    "body": [
+      "écrire(${1:valeur})"
+    ],
+    "description": "Affiche une valeur dans la sortie standard."
+  },
+  "Lire (saisie)": {
+    "prefix": "lire",
+    "body": [
+      "${1:variable} ← lire()"
+    ],
+    "description": "Lit une valeur depuis l'entrée standard."
+  },
+  "Déclaration de tableau": {
+    "prefix": "tableau",
+    "body": [
+      "${1:tab} ← tableau ${2:entier}[${3:0}..${4:9}]"
+    ],
+    "description": "Déclare et initialise un tableau."
+  },
+  "Type composite (structure)": {
+    "prefix": "type",
+    "body": [
+      "${1:NomType} = <${2:champ1} : ${3:type1}, ${4:champ2} : ${5:type2}>"
+    ],
+    "description": "Déclare un type composite (structure) avec des champs nommés."
+  },
+  "Retourner": {
+    "prefix": "retourner",
+    "body": [
+      "retourner ${1:valeur}"
+    ],
+    "description": "Retourne une valeur depuis une fonction."
   }
 }

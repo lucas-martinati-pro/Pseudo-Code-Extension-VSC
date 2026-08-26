@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { formatDocument } from './formatter';
-import { executeCode } from './services/runner';
+import { executeCode, cleanOldTempFiles } from './services/runner';
 import { linter } from './services/linter';
 import { handleSymbolReplacement as handleSymbolReplacementImpl } from './autoEdits/symbols';
 
@@ -9,6 +9,7 @@ const diagnosticsCollection = vscode.languages.createDiagnosticCollection('psc')
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('PSC Language Support is now active!');
+    cleanOldTempFiles();
 
     // --- On garde le code du formateur ---
     const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider('psc', {

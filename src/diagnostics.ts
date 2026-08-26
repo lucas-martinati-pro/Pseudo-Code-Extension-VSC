@@ -15,11 +15,40 @@ const REGEX_IDENT_CHAR_FULL = /[\p{L}0-9_]/u;
 const REGEX_IDENTIFIER_EXTRACT = /^[\p{L}_][\p{L}0-9_]*/u;
 const REGEX_WHITESPACE = /\s/;
 
+// Patterns pour la détection des blocs
+const REGEX_OPEN_SI = /^\s*Si\b/i;
+const REGEX_OPEN_SINON_SI = /^\s*Sinon\s+si\b/i;
+const REGEX_OPEN_POUR = /^\s*Pour\b/i;
+const REGEX_OPEN_TANT_QUE = /^\s*Tant\s+que\b/i;
+const REGEX_OPEN_DEBUT = /^\s*Début\b/i;
+const REGEX_CLOSE_FSI = /^\s*fsi\b/i;
+const REGEX_CLOSE_FPOUR = /^\s*fpour\b/i;
+const REGEX_CLOSE_FTQ = /^\s*(ftq|ftant)\b/i;
+const REGEX_CLOSE_FIN = /^\s*Fin\b/i;
+
+const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
+const REGEX_VAR_DECL_IN_LEXIQUE = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)*)\s*:\s*.+/iu;
+
 // Cache pour les identifiants connus en minuscules (optimisation lookup)
 const KNOWN_IDENTIFIERS_LOWER = new Set([...KNOWN_IDENTIFIERS].map(id => id.toLowerCase()));
 
+// Types de blocs ouvrants et leurs fermetures attendues
+type BlockType = 'Si' | 'Pour' | 'TantQue' | 'Début';
+interface BlockInfo {
+    type: BlockType;
+    lineNumber: number;
+    lineText: string;
+}
+
+const EXPECTED_CLOSING: Record<BlockType, string> = {
+    'Si': 'fsi',
+    'Pour': 'fpour',
+    'TantQue': 'ftq/ftant',
+    'Début': 'Fin'
+};
+
 /**
- * Cœur du Linter avec gestion de la portée lexicale et déclaration implicite.
+ * Cœur du Linter avec gestion de la portée lexicale, déclaration implicite et vérification des blocs.
  */
 export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.DiagnosticCollection): void {
     if (doc.languageId !== 'psc') {
@@ -32,7 +61,12 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
     const declaredFunctions = new Set<string>();
     const declaredCompositeTypes = new Set<string>();
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PASSE 1 : Collecter les fonctions, types composites et variables du Lexique
+    // ═══════════════════════════════════════════════════════════════════════════
     const lineCount = doc.lineCount;
+    let inLexiqueBlock = false;
+
     for (let i = 0; i < lineCount; i++) {
         const lineText = doc.lineAt(i).text;
         const trimmed = lineText.trim();
@@ -42,6 +76,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(trimmed);
         if (funcMatch) {
             declaredFunctions.add(funcMatch[1]);
+            inLexiqueBlock = false;
             continue;
         }
 
@@ -49,12 +84,40 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const typeMatch = PATTERNS.COMPOSITE_TYPE.exec(trimmed);
         if (typeMatch) {
             declaredCompositeTypes.add(typeMatch[1].toLowerCase());
+            continue;
+        }
+
+        // Détection du début d'un bloc Lexique
+        if (REGEX_LEXIQUE_LINE.test(trimmed)) {
+            inLexiqueBlock = true;
+            continue;
+        }
+
+        // Sortie du bloc Lexique (un mot-clé structurel met fin au Lexique)
+        if (inLexiqueBlock) {
+            if (REGEX_OPEN_DEBUT.test(trimmed) || /^\s*(Algorithme|Fonction)\b/i.test(trimmed) || /^\s*Fin\b/i.test(trimmed)) {
+                inLexiqueBlock = false;
+            } else {
+                // Parser les déclarations de variables dans le Lexique
+                const varDecl = REGEX_VAR_DECL_IN_LEXIQUE.exec(trimmed);
+                if (varDecl) {
+                    const varNames = varDecl[1].split(',').map(v => v.trim());
+                    for (const v of varNames) {
+                        if (v) {
+                            scopeStack[0].add(v); // Ajouter au scope global
+                        }
+                    }
+                }
+            }
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PASSE 2 : Analyse avec contexte de portées et vérification des blocs
+    // ═══════════════════════════════════════════════════════════════════════════
     let inBlockComment = false;
+    const blockStack: BlockInfo[] = [];
 
-    // Deuxième passe: analyse avec contexte de portées
     for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
         const line = doc.lineAt(lineIndex);
         const nonCommentText = cleanLineFromComments(line.text, inBlockComment);
@@ -66,10 +129,115 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         // Ignorer les déclarations de types composites
         if (PATTERNS.COMPOSITE_TYPE.test(trimmedText)) continue;
 
+        // ─── Détection des blocs ouvrants ───
         const isOpeningBlock = PATTERNS.OPENING_BLOCK.test(trimmedText);
         const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(trimmedText);
         const pourMatch = REGEX_POUR_LOOP.exec(trimmedText);
 
+        // Suivi des blocs pour vérification de fermeture
+        if (REGEX_OPEN_SINON_SI.test(trimmedText)) {
+            // Sinon si : ne crée pas un nouveau bloc Si, c'est une continuation
+            // On ne touche pas au blockStack
+        } else if (REGEX_OPEN_SI.test(trimmedText) && !REGEX_OPEN_SINON_SI.test(trimmedText)) {
+            blockStack.push({ type: 'Si', lineNumber: lineIndex, lineText: trimmedText });
+        }
+        if (REGEX_OPEN_POUR.test(trimmedText)) {
+            blockStack.push({ type: 'Pour', lineNumber: lineIndex, lineText: trimmedText });
+        }
+        if (REGEX_OPEN_TANT_QUE.test(trimmedText)) {
+            blockStack.push({ type: 'TantQue', lineNumber: lineIndex, lineText: trimmedText });
+        }
+        if (REGEX_OPEN_DEBUT.test(trimmedText)) {
+            blockStack.push({ type: 'Début', lineNumber: lineIndex, lineText: trimmedText });
+        }
+
+        // ─── Détection des blocs fermants avec vérification ───
+        if (REGEX_CLOSE_FSI.test(trimmedText)) {
+            if (blockStack.length > 0) {
+                const lastBlock = blockStack[blockStack.length - 1];
+                if (lastBlock.type === 'Si') {
+                    blockStack.pop();
+                } else {
+                    // Bloc mal fermé
+                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
+                    diagnostics.push(new vscode.Diagnostic(
+                        range,
+                        `'fsi' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
+                        vscode.DiagnosticSeverity.Error
+                    ));
+                    blockStack.pop(); // On pop quand même pour éviter les cascades d'erreurs
+                }
+            } else {
+                const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
+                diagnostics.push(new vscode.Diagnostic(
+                    range,
+                    `'fsi' inattendu : aucun bloc 'Si' ouvert.`,
+                    vscode.DiagnosticSeverity.Error
+                ));
+            }
+        } else if (REGEX_CLOSE_FPOUR.test(trimmedText)) {
+            if (blockStack.length > 0) {
+                const lastBlock = blockStack[blockStack.length - 1];
+                if (lastBlock.type === 'Pour') {
+                    blockStack.pop();
+                } else {
+                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
+                    diagnostics.push(new vscode.Diagnostic(
+                        range,
+                        `'fpour' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
+                        vscode.DiagnosticSeverity.Error
+                    ));
+                    blockStack.pop();
+                }
+            } else {
+                const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
+                diagnostics.push(new vscode.Diagnostic(
+                    range,
+                    `'fpour' inattendu : aucun bloc 'Pour' ouvert.`,
+                    vscode.DiagnosticSeverity.Error
+                ));
+            }
+        } else if (REGEX_CLOSE_FTQ.test(trimmedText)) {
+            if (blockStack.length > 0) {
+                const lastBlock = blockStack[blockStack.length - 1];
+                if (lastBlock.type === 'TantQue') {
+                    blockStack.pop();
+                } else {
+                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
+                    diagnostics.push(new vscode.Diagnostic(
+                        range,
+                        `'ftq' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
+                        vscode.DiagnosticSeverity.Error
+                    ));
+                    blockStack.pop();
+                }
+            } else {
+                const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
+                diagnostics.push(new vscode.Diagnostic(
+                    range,
+                    `'ftq' inattendu : aucun bloc 'Tant que' ouvert.`,
+                    vscode.DiagnosticSeverity.Error
+                ));
+            }
+        } else if (REGEX_CLOSE_FIN.test(trimmedText)) {
+            if (blockStack.length > 0) {
+                const lastBlock = blockStack[blockStack.length - 1];
+                if (lastBlock.type === 'Début') {
+                    blockStack.pop();
+                } else {
+                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
+                    diagnostics.push(new vscode.Diagnostic(
+                        range,
+                        `'Fin' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
+                        vscode.DiagnosticSeverity.Error
+                    ));
+                    blockStack.pop();
+                }
+            }
+            // Note: 'Fin' sans 'Début' n'est pas nécessairement une erreur (fin de fichier, fin d'algo)
+        }
+
+        // ─── Gestion des portées (scope) ───
         if (isOpeningBlock || funcMatch || pourMatch) {
             const newScope = new Set<string>();
             if (funcMatch) {
@@ -140,6 +308,17 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         if (PATTERNS.CLOSING_KEYWORDS.test(trimmedText) && scopeStack.length > 1) {
             scopeStack.pop();
         }
+    }
+
+    // ─── Blocs non fermés à la fin du fichier ───
+    for (const unclosed of blockStack) {
+        const line = doc.lineAt(unclosed.lineNumber);
+        const range = new vscode.Range(unclosed.lineNumber, 0, unclosed.lineNumber, line.text.length);
+        diagnostics.push(new vscode.Diagnostic(
+            range,
+            `Bloc '${unclosed.type}' non fermé. Il manque un '${EXPECTED_CLOSING[unclosed.type]}'.`,
+            vscode.DiagnosticSeverity.Error
+        ));
     }
 
     collection.set(doc.uri, diagnostics);
@@ -250,12 +429,14 @@ function checkFunctionCallsInExpression(
 
             if (Object.prototype.hasOwnProperty.call(BUILTIN_FUNCTION_ARITY, lower)) {
                 const expected = BUILTIN_FUNCTION_ARITY[lower];
-                if (expected !== arity) {
+                const isValid = Array.isArray(expected) ? expected.includes(arity) : expected === arity;
+                if (!isValid) {
                     const startCol = expressionOffsetInLine + i;
                     const range = new vscode.Range(line.lineNumber, startCol, line.lineNumber, startCol + funcName.length);
+                    const expectedStr = Array.isArray(expected) ? expected.join(' ou ') : expected.toString();
                     diagnostics.push(new vscode.Diagnostic(
                         range,
-                        `La fonction intégrée '${funcName}' attend ${expected} argument(s), mais ${arity} fourni(s).`,
+                        `La fonction intégrée '${funcName}' attend ${expectedStr} argument(s), mais ${arity} fourni(s).`,
                         vscode.DiagnosticSeverity.Error
                     ));
                 }

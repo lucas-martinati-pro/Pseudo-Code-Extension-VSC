@@ -12,33 +12,55 @@
     { "open": "{", "close": "}" },
     { "open": "[", "close": "]" },
     { "open": "(", "close": ")" },
-    { "open": "\"", "close": "\"", "notIn": ["string"] }
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "'", "close": "'", "notIn": ["string"] },
+    { "open": "/*", "close": " */", "notIn": ["string"] }
   ],
   "surroundingPairs": [
     ["{", "}"],
     ["[", "]"],
     ["(", ")"],
-    ["\"", "\""]
+    ["\"", "\""],
+    ["'", "'"]
   ],
+  "folding": {
+    "markers": {
+      "start": "(?i)^\\s*(Début|Si\\b.*Alors\\s*:|Pour\\b.*Faire\\s*:|Tant\\s+que\\b.*Faire\\s*:|Sinon\\s*:?)\\s*$",
+      "end": "(?i)^\\s*(Fin|fsi|fpour|ftq|ftant)\\b"
+    }
+  },
+  "wordPattern": "[\\p{L}_][\\p{L}0-9_]*",
+  "indentationRules": {
+    "increaseIndentPattern": "(?i)^\\s*(Début|.*(?:Alors|Faire)\\s*:|Sinon(?:\\s+si\\b.*Alors)?\\s*:?)\\s*$",
+    "decreaseIndentPattern": "(?i)^\\s*(Fin|fsi|fpour|ftq|ftant|Sinon)\\b"
+  },
   "onEnterRules": [
     {
-      "beforeText": "^\\s*(?i)Pour .* Faire :\\s*$",
-      "action": { "indent": "indentOutdent", "appendText": "fpour" }
+      "beforeText": "(?i)^\\s*Pour\\s+.*Faire\\s*:\\s*$",
+      "action": { "indent": "indent" },
+      "afterText": "(?i)^\\s*fpour\\s*$"
     },
     {
-      "beforeText": "^\\s*(?i)Tant que .* Faire :\\s*$",
-      "action": { "indent": "indentOutdent", "appendText": "ftq" }
+      "beforeText": "(?i)^\\s*Tant\\s+que\\s+.*Faire\\s*:\\s*$",
+      "action": { "indent": "indent" },
+      "afterText": "(?i)^\\s*ftq\\s*$"
     },
     {
-      "beforeText": "^\\s*(?i)Si .* Alors :\\s*$",
-      "action": { "indent": "indentOutdent", "appendText": "fsi" }
+      "beforeText": "(?i)^\\s*Si\\s+.*Alors\\s*:\\s*$",
+      "action": { "indent": "indent" },
+      "afterText": "(?i)^\\s*fsi\\s*$"
     },
     {
-      "beforeText": "^\\s*(?i)Début\\s*$",
-      "action": { "indent": "indentOutdent", "appendText": "Fin" }
+      "beforeText": "(?i)^\\s*Sinon\\s+si\\s+.*Alors\\s*:\\s*$",
+      "action": { "indent": "indent" }
     },
     {
-      "beforeText": "^\\s*(?i)Sinon\\s*$",
+      "beforeText": "(?i)^\\s*Début\\s*$",
+      "action": { "indent": "indent" },
+      "afterText": "(?i)^\\s*Fin\\s*$"
+    },
+    {
+      "beforeText": "(?i)^\\s*Sinon\\s*:?\\s*$",
       "action": { "indent": "indent" }
     }
   ]

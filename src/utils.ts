@@ -161,6 +161,28 @@ export function maskStrings(text: string): string {
 }
 
 /**
+ * Protège les chaînes de caractères d'une ligne avant la transpilation
+ * en les remplaçant par des marqueurs temporaires __PSC_STR_n__
+ */
+export function protectStrings(text: string): { text: string; strings: string[] } {
+    const strings: string[] = [];
+    const protectedText = text.replace(/"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'/g, (m) => {
+        const id = strings.length;
+        strings.push(m);
+        return `__PSC_STR_${id}__`;
+    });
+    return { text: protectedText, strings };
+}
+
+/**
+ * Restaure les chaînes de caractères protégées après les remplacements
+ */
+export function restoreStrings(text: string, strings: string[]): string {
+    if (strings.length === 0) return text;
+    return text.replace(/__PSC_STR_(\d+)__/g, (_, id) => strings[parseInt(id, 10)] ?? '');
+}
+
+/**
  * Supprime les accès aux champs (obj.field) pour ne garder que les variables de base
  * OPTIMISÉ: Limite le nombre d'itérations et utilise des regex pré-compilées
  */

@@ -54,12 +54,15 @@ const baseTypes = PSC_DEFINITIONS.types
 // Mettre à jour les patterns dans la grammaire
 const repository = grammar.repository;
 
+// Pattern d'identifiant Unicode (supporte les accents)
+const IDENT_START = '[a-zA-Z\\u00C0-\\u024F_]';
+const IDENT_CHAR = '[a-zA-Z0-9\\u00C0-\\u024F_]';
+
 // 1. Mots-clés de contrôle + blocs (Début, Fin, etc.)
 if (repository['keywords']) {
-    // Combiner control et block keywords, gérer "Tant que" comme cas spécial
     const allKeywords = [...controlKeywords, ...blockKeywords]
-        .filter(k => !['tant', 'que'].includes(k)); // On gère "Tant que" séparément
-    repository['keywords'].match = `(?i)\\b(${allKeywords.join('|')}|Tant(?:\\s+que)|ftant)\\b`;
+        .filter(k => !['tant', 'que'].includes(k));
+    repository['keywords'].match = `(?i)\\b(${allKeywords.join('|')}|Tant(?:\\s+que)|Sinon(?:\\s+si)|ftant)\\b`;
 }
 
 // 2. Opérateurs logiques
@@ -105,6 +108,64 @@ if (repository['constants']) {
     }
 }
 
+// 6. Mettre à jour les déclarations pour supporter Unicode
+if (repository['declarations']) {
+    const patterns = repository['declarations'].patterns;
+
+    // Fonction
+    const funcPattern = patterns.find((p: any) => p.begin && p.begin.includes('Fonction'));
+    if (funcPattern) {
+        funcPattern.begin = `(?i)^\\s*(Fonction)\\s+(${IDENT_START}${IDENT_CHAR}*)\\s*(\\()`;
+    }
+
+    // Algorithme
+    const algoPattern = patterns.find((p: any) => p.match && p.match.includes('Algorithme'));
+    if (algoPattern) {
+        algoPattern.match = `(?i)^\\s*(Algorithme)(?:\\s+(${IDENT_START}${IDENT_CHAR}*))?`;
+    }
+}
+
+// 7. Mettre à jour les appels de fonction pour supporter Unicode
+if (repository['function-call']) {
+    repository['function-call'].match = `(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)(${IDENT_START}${IDENT_CHAR}*)(?=\\s*\\()`;
+}
+
+// 8. Mettre à jour les variables pour supporter Unicode
+if (repository['variables']) {
+    repository['variables'].match = `(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b`;
+}
+
+// 9. Mettre à jour la boucle for pour supporter Unicode
+if (repository['for-loop']) {
+    repository['for-loop'].begin = `(?i)\\b(Pour)\\s+(${IDENT_START}${IDENT_CHAR}*)\\s+(de|allant\\s+de)\\b`;
+}
+
+// 10. Mettre à jour la détection de type après deux-points pour supporter Unicode
+if (repository['storage']) {
+    const patterns = repository['storage'].patterns;
+    const typeAfterColonPattern = patterns.find((p: any) =>
+        p.name === 'storage.type' && p.match && p.match.includes('(?<=:)')
+    );
+    if (typeAfterColonPattern) {
+        typeAfterColonPattern.match = `(?i)(?<=:)\\s*([A-Z\\u00C0-\\u024F]${IDENT_CHAR}*)\\b(?!\\s*\\()`;
+    }
+
+    // Entity name type declaration
+    const entityPattern = patterns.find((p: any) => p.name === 'entity.name.type.declaration');
+    if (entityPattern) {
+        entityPattern.match = `^\\s*([A-Z\\u00C0-\\u024F]${IDENT_CHAR}*)\\s*=`;
+    }
+}
+
+// Opérateurs Unicode (≤, ≥, ≠, ←, →)
+if (repository['operators-comparison']) {
+    repository['operators-comparison'].match = '(≤|≥|≠|<=|>=|!=|<>|=/|=|<|>|\\.\\.)';
+}
+
+if (repository['operators-assignment']) {
+    repository['operators-assignment'].match = '(←|→)';
+}
+
 const grammarJson = JSON.stringify(grammar, null, 2);
 fs.writeFileSync(grammarPath, grammarJson, 'utf-8');
 
@@ -113,3 +174,4 @@ console.log(`  - ${controlKeywords.length + blockKeywords.length} mots-clés de 
 console.log(`  - ${supportFunctions.length} fonctions intégrées`);
 console.log(`  - ${ioKeywords.length} fonctions I/O`);
 console.log(`  - ${baseTypes.length} types de base`);
+console.log(`  - Support Unicode pour les identifiants activé`);

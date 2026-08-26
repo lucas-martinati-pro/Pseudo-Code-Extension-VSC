@@ -3,3 +3,11 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+
+# Compiled JS in src (output goes to out/)
+src/**/*.js
+src/**/*.js.map
+
+# Windows system files
+desktop.ini
+Thumbs.db

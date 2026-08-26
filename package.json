@@ -2,7 +2,7 @@
   "name": "pseudocode-interpreter",
   "displayName": "PseudoCode Language Interpreter",
   "description": "Advanced syntax highlighting, intelligent snippets and symbol navigation for the PSC language.",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "publisher": "LucasM54",
   "author": {
     "name": "Lucas Martinati"
@@ -16,8 +16,23 @@
     "vscode": "^1.104.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Education",
+    "Formatters",
+    "Linters"
   ],
+  "keywords": [
+    "pseudo-code",
+    "pseudocode",
+    "algorithme",
+    "french",
+    "français",
+    "education",
+    "psc",
+    "transpiler",
+    "lua"
+  ],
+  "license": "MIT",
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
@@ -73,7 +88,15 @@
       {
         "command": "psc.execute",
         "title": "Exécuter le fichier Pseudo-Code",
-        "category": "PSC"
+        "category": "PSC",
+        "icon": "$(play)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "psc.execute",
+        "key": "ctrl+f5",
+        "when": "resourceLangId == psc"
       }
     ],
     "menus": {
@@ -97,6 +120,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.6.0",
     "@types/vscode": "^1.104.0",
+    "@vscode/vsce": "^3.9.2",
     "typescript": "^5.9.3"
   }
 }

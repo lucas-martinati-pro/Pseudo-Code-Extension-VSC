@@ -24,7 +24,7 @@ export const KEYWORDS = {
 
 // Arité attendue des fonctions intégrées (pour le linter)
 // Clés en minuscules (comparaison insensible à la casse côté linter)
-export const BUILTIN_FUNCTION_ARITY: Record<string, number> = Object.fromEntries(
+export const BUILTIN_FUNCTION_ARITY: Record<string, number | number[]> = Object.fromEntries(
     PSC_DEFINITIONS.functions.map(f => [f.name, f.arity])
 );
 
@@ -126,54 +126,110 @@ export const FUNCTION_MAPPING: Record<string, string> = Object.fromEntries(
 
 // Helpers Lua
 export const LUA_HELPERS = `if package.config:sub(1,1) == "\\\\" then os.execute("chcp 65001 >nul") end
+local FIN_LIGNE = "\\n"
 local __psc_file_handles = {}
+local __psc_virtual_files = {}
 local __psc_file_current_handle = 1
 
-local function __psc_fichierCreer(nomFichier)
-    return __psc_fichierOuvrir(nomFichier, "w")
-end
+local __psc_fichierOuvrir
+local __psc_fichierCreer
+local __psc_fichierEcrire
+local __psc_fichierLire
+local __psc_fichierFin
+local __psc_fichierFermer
 
-local function __psc_fichierEcrire(handle, value)
-    if __psc_file_handles[handle] then
-        __psc_file_handles[handle]:write(tostring(value))
-    end
-end
-
-local function __psc_fichierOuvrir(nomFichier, mode)
+__psc_fichierOuvrir = function(nomFichier, mode)
+    nomFichier = tostring(nomFichier or "fichier.txt")
     mode = mode or "r"
     local file, err = io.open(nomFichier, mode)
-    if not file then
-        print("Erreur d'ouverture du fichier: " .. tostring(err))
-        return nil
-    end
     local handle = __psc_file_current_handle
-    __psc_file_handles[handle] = file
     __psc_file_current_handle = __psc_file_current_handle + 1
+
+    if file then
+        __psc_file_handles[handle] = { file = file, is_real = true, mode = mode, name = nomFichier }
+        return handle
+    end
+
+    -- Fallback virtuel en mémoire si le fichier physique est inaccessible
+    if not __psc_virtual_files[nomFichier] or mode == "w" then
+        __psc_virtual_files[nomFichier] = { lines = {}, name = nomFichier }
+    end
+    __psc_file_handles[handle] = {
+        virtual = __psc_virtual_files[nomFichier],
+        is_real = false,
+        pos = 1,
+        mode = mode,
+        name = nomFichier
+    }
     return handle
 end
 
-local function __psc_fichierFermer(handle)
-    if __psc_file_handles[handle] then
-        __psc_file_handles[handle]:close()
+__psc_fichierCreer = function(nomFichier)
+    return __psc_fichierOuvrir(nomFichier, "w")
+end
+
+__psc_fichierEcrire = function(handle, value)
+    handle = handle or (__psc_file_current_handle - 1)
+    local entry = __psc_file_handles[handle]
+    if not entry then return end
+
+    if entry.is_real then
+        entry.file:write(tostring(value))
+        entry.file:flush()
+    else
+        local str = tostring(value)
+        local lines = entry.virtual.lines
+        if #lines == 0 then table.insert(lines, "") end
+        if str == "\\n" then
+            table.insert(lines, "")
+        else
+            lines[#lines] = lines[#lines] .. str
+        end
+    end
+end
+
+__psc_fichierFermer = function(handle)
+    handle = handle or (__psc_file_current_handle - 1)
+    local entry = __psc_file_handles[handle]
+    if entry then
+        if entry.is_real and entry.file then
+            entry.file:close()
+        end
         __psc_file_handles[handle] = nil
     end
 end
 
-local function __psc_fichierLire(handle)
-    if __psc_file_handles[handle] then
-        return __psc_file_handles[handle]:read()
+__psc_fichierLire = function(handle)
+    handle = handle or (__psc_file_current_handle - 1)
+    local entry = __psc_file_handles[handle]
+    if not entry then return nil end
+
+    if entry.is_real then
+        local line = entry.file:read("*l")
+        if line ~= nil then
+            return line:match("^%s*(.-)%s*$") or line
+        else
+            entry.eof = true
+            return nil
+        end
+    else
+        local v = entry.virtual
+        if entry.pos <= #v.lines then
+            local line = v.lines[entry.pos]
+            entry.pos = entry.pos + 1
+            return line:match("^%s*(.-)%s*$") or line
+        else
+            entry.eof = true
+            return nil
+        end
     end
-    return nil
 end
 
-local function __psc_fichierFin(handle)
-    if __psc_file_handles[handle] then
-        local pos = __psc_file_handles[handle]:seek()
-        local _, err = __psc_file_handles[handle]:read(0)
-        __psc_file_handles[handle]:seek("set", pos)
-        return err == "end of file"
-    end
-    return true
+__psc_fichierFin = function(handle)
+    handle = handle or (__psc_file_current_handle - 1)
+    local entry = __psc_file_handles[handle]
+    if not entry then return true end
+    return entry.eof == true
 end
 
 local function __psc_chaineVersEntier(chaine)
@@ -181,15 +237,86 @@ local function __psc_chaineVersEntier(chaine)
 end
 
 -- Fonction de lecture personnalisée qui convertit automatiquement en nombre si possible
-local function __psc_lire()
-    local input = io.read()
-    if input then
-        local num = tonumber(input)
-        if num then
-            return num
-        end
+local function __psc_lire(prompt)
+    if prompt then
+        io.write(tostring(prompt))
+        io.flush()
     end
-    return input
+    local input = io.read("*l")
+    if not input then return 0 end
+    local clean = input:match("^%s*(.-)%s*$")
+    if clean == nil or clean == "" then
+        return 0
+    end
+    local num = tonumber(clean) or tonumber((clean:gsub(",", ".")))
+    if num ~= nil then
+        return num
+    end
+    return clean
+end
+
+-- Metatable pour les types composites (égalité par valeur et affichage lisible)
+local __psc_composite_mt
+__psc_composite_mt = {
+    __eq = function(a, b)
+        if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+        for k, v in pairs(a) do
+            if b[k] ~= v and not (type(v) == "table" and type(b[k]) == "table" and v == b[k]) then
+                return false
+            end
+        end
+        for k, v in pairs(b) do
+            if a[k] == nil then return false end
+        end
+        return true
+    end,
+    __tostring = function(t)
+        local parts = {}
+        for k, v in pairs(t) do
+            table.insert(parts, tostring(k) .. " = " .. tostring(v))
+        end
+        return "<" .. table.concat(parts, ", ") .. ">"
+    end
+}
+
+local function __psc_create_composite(t)
+    return setmetatable(t, __psc_composite_mt)
+end
+
+-- Comparaison générique pour tri et algorithmes
+local function __psc_comparaison(a, b)
+    if a == nil and b == nil then return false end
+    if a == nil then return false end
+    if b == nil then return true end
+    if type(a) == "number" and type(b) == "number" then
+        return a > b
+    elseif type(a) == "string" and type(b) == "string" then
+        return a > b
+    elseif type(a) == "table" and type(b) == "table" then
+        -- Enregistrement Date (annee, mois, jour)
+        if a.annee ~= nil and b.annee ~= nil then
+            if a.annee ~= b.annee then return a.annee > b.annee end
+            if a.mois ~= nil and b.mois ~= nil and a.mois ~= b.mois then return a.mois > b.mois end
+            if a.jour ~= nil and b.jour ~= nil then return a.jour > b.jour end
+            return false
+        end
+        -- Enregistrement avec dateNaiss
+        if a.dateNaiss ~= nil and b.dateNaiss ~= nil then
+            return __psc_comparaison(a.dateNaiss, b.dateNaiss)
+        end
+        -- Enregistrement avec nom/prenom
+        if a.nom ~= nil and b.nom ~= nil and a.nom ~= b.nom then
+            return a.nom > b.nom
+        end
+        -- Comparaison générale des champs
+        for k, v in pairs(a) do
+            if b[k] ~= nil and v ~= b[k] then
+                return __psc_comparaison(v, b[k])
+            end
+        end
+        return false
+    end
+    return tostring(a) > tostring(b)
 end
 
 
@@ -300,12 +427,29 @@ local function __psc_serialize(v)
 end
 
 local function __psc_write(...)
-    local args = {...}
-    local parts = {}
-    for i = 1, #args do
-        parts[i] = __psc_serialize(args[i])
+    local n = select("#", ...)
+    if n == 0 then
+        print()
+        return
     end
-    print(table.concat(parts, ''))
+    local parts = {}
+    for i = 1, n do
+        local v = select(i, ...)
+        parts[i] = __psc_serialize(v)
+    end
+    local res = ""
+    for i = 1, n do
+        if i == 1 then
+            res = parts[i]
+        else
+            if res:match("%s$") or parts[i]:match("^%s") then
+                res = res .. parts[i]
+            else
+                res = res .. " " .. parts[i]
+            end
+        end
+    end
+    print(res)
 end
 -- TDA Liste (places entières)
 local function __psc_liste_tete(l)

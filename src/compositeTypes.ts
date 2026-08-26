@@ -111,7 +111,7 @@ export class CompositeTypeRegistry {
                             return `${field.name} = ${value}`;
                         });
 
-                        const replacement = `__PSC_TABLE_START__{${fieldAssignments.join(', ')}}__PSC_TABLE_END__`;
+                        const replacement = `__PSC_TABLE_START____psc_create_composite({${fieldAssignments.join(', ')}})__PSC_TABLE_END__`;
                         result = result.substring(0, startPos) + replacement + result.substring(closeParenPos + 1);
 
                         changed = true;
@@ -147,11 +147,11 @@ export class CompositeTypeRegistry {
                         const value = args[index] || 'nil';
                         return `${field.name} = ${value}`;
                     });
-                    return `__PSC_TABLE_START__{${fieldAssignments.join(', ')}}__PSC_TABLE_END__`;
+                    return `__PSC_TABLE_START____psc_create_composite({${fieldAssignments.join(', ')}})__PSC_TABLE_END__`;
                 }
 
                 // Table avec indices numériques
-                return `__PSC_TABLE_START__{${content}}__PSC_TABLE_END__`;
+                return `__PSC_TABLE_START____psc_create_composite({${content}})__PSC_TABLE_END__`;
             }
 
             return match; // Pas un littéral

@@ -2,43 +2,36 @@
  * Transpileur Pseudo-Code vers Lua
  */
 
-import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { PATTERNS, LUA_REPLACEMENTS, FUNCTION_MAPPING, LUA_HELPERS } from './constants';
+import { PATTERNS, LUA_HELPERS } from './constants';
 import { PSC_DEFINITIONS } from './definitions';
-import { normalizeType, smartSplitArgs, findMatchingParen } from './utils';
+import { smartSplitArgs, findMatchingParen, protectStrings, restoreStrings } from './utils';
 import { FunctionRegistry } from './functionRegistry';
 import { CompositeTypeRegistry } from './compositeTypes';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REGEX PRÉ-COMPILÉES (éviter la recompilation à chaque ligne)
 // ═══════════════════════════════════════════════════════════════════════════════
-const REGEX_BUILTIN_TYPES = /^(entier|réel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|pile|file|listesym)$/i;
-const REGEX_INOUT = /\bInOut\b/i;
-const REGEX_TYPE_NAME = /^([\p{L}0-9_]+)/iu;
+
 const REGEX_BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
-const REGEX_LEXIQUE_BLOCK = /Lexique\s*:?[\s\S]*?(?=\n\s*(?:Début|Fonction|Algorithme|$))/i;
-const REGEX_SMART_QUOTES = /[""]/g;
+const REGEX_LEXIQUE_BLOCK = /Lexique\s*:?[\s\S]*?(?=\n\s*(?:D\u00e9but|Fonction|Algorithme))/gi;
+const REGEX_SMART_QUOTES = /[\u201c\u201d]/g;
 const REGEX_ALGORITHM = /^\s*algorithme\b/i;
 const REGEX_FIN = /^\s*Fin\b/i;
-const REGEX_DEBUT_OR_LEXIQUE = /^\s*(Début|Lexique)\b/i;
+const REGEX_DEBUT_OR_LEXIQUE = /^\s*(D\u00e9but|Lexique)\b/i;
 const REGEX_CLOSING_BLOCKS = /^\s*(Fin|fsi|fpour|ftq|ftant)\b/i;
-const REGEX_LIRE_ASSIGNMENT = /^\s*[\p{L}0-9_]+\s*←\s*lire\s*\(\s*\)\s*$/iu;
+const REGEX_LIRE_ASSIGNMENT = /^\s*[\p{L}0-9_]+\s*(?:←|<-)\s*lire\s*\(\s*\)\s*$/iu;
 const REGEX_FONCTION = /^\s*fonction\s/i;
 const REGEX_FONCTION_NAME = /^\s*Fonction\s+([\p{L}_][\p{L}0-9_]*)/iu;
 const REGEX_POUR_LOOP = /^\s*Pour\s/i;
 const REGEX_POUR_TABLE_ITER = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)\s+de\s+([\p{L}_][\p{L}0-9_]*)\s+Faire\s*:?\s*$/iu;
-const REGEX_POUR_CLASSIC = /^\s*Pour\s+([\p{L}0-9_]+)\s+(?:allant de|de)\s+(.+)\s+(?:a|à)\s+(.+)\s+Faire\s*:?/iu;
-const REGEX_DECROISSANT = /\bdécroissant\b/i;
+const REGEX_POUR_CLASSIC = /^\s*Pour\s+([\p{L}0-9_]+)\s+(?:allant de|de)\s+(.+)\s+(?:a|\u00e0)\s+(.+)\s+Faire\s*:?/iu;
+const REGEX_DECROISSANT = /\bd\u00e9croissant\b/i;
 const REGEX_TANT_QUE = /^\s*Tant que\b/i;
 const REGEX_FAIRE = /\s+Faire\s*:?/i;
 const REGEX_SI = /^\s*Si\b/i;
 const REGEX_SINON_SI = /^\s*Sinon\s+si\b/i;
 const REGEX_SINON = /^\s*Sinon\b\s*:?/i;
 const REGEX_ALORS_FAIRE = /\s+(Alors|Faire)\s*:?/i;
-const REGEX_ECRIRE = /^écrire\(/i;
 const REGEX_RETOURNER = /^\s*retourne(?:r)?\b/i;
 const REGEX_RETOURNER_PAREN = /^\s*retourne(?:r)?\s*\(/i;
 const REGEX_RETOURNER_VALUE = /^\s*retourne(?:r)?\s+(.+)$/i;
@@ -46,86 +39,33 @@ const REGEX_RETURN_LINE = /^\s*return\b/i;
 const REGEX_IF_CONDITION = /^(\s*if\s+)(.*?)(\s+then\s*:?)\s*$/i;
 const REGEX_ELSEIF_CONDITION = /^(\s*elseif\s+)(.*?)(\s+then\s*:?)\s*$/i;
 const REGEX_WHILE_CONDITION = /^(\s*while\s+)(.*?)(\s+do\s*:?)\s*$/i;
-const REGEX_ARRAY_DECL = /^\s*([\p{L}_][\p{L}0-9_]*)\s*(?:=|←)\s*tableau\s+[\p{L}_][\p{L}0-9_]*\s*\[([^\]]+)\]\s*$/iu;
+const REGEX_ARRAY_DECL = /^\s*([\p{L}_][\p{L}0-9_]*)\s*(?:=|\u2190)\s*tableau\s+[\p{L}_][\p{L}0-9_]*\s*\[([^\]]+)\]\s*$/iu;
 const REGEX_INDENTATION = /^\s*/;
 const REGEX_MULTI_INDEX = /([\p{L}0-9_]+)\s*\[([^\]]+)\]/gu;
 const REGEX_MULTI_BRACKET = /([\p{L}0-9_]+)\s*((?:\[[^\]]+\])+)/gu;
 const REGEX_BRACKET_EXTRACT = /\[([^\]]+)\]/g;
 const REGEX_ARRAY_LITERAL = /(?:(?<=^)|(?<=[\s=,(;:]))\[([^\]]*)\]/gu;
 
-
-/**
- * Collecte les types de variables déclarées dans le code
- */
-function collectVariableTypes(pscCode: string): Map<string, string> {
-    const variableTypes = new Map<string, string>();
-    const lines = pscCode.split('\n');
-
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-
-        // Déclarations de variables simples
-        const declarationMatch = PATTERNS.VARIABLE_DECLARATION.exec(trimmedLine);
-        if (declarationMatch && !PATTERNS.FUNCTION_DECLARATION.test(trimmedLine)) {
-            const rawType = declarationMatch[2];
-            const type = REGEX_BUILTIN_TYPES.test(rawType)
-                ? normalizeType(rawType)
-                : rawType;
-            const varNames = declarationMatch[1].split(',').map(v => v.trim());
-            varNames.forEach(v => {
-                if (v) variableTypes.set(v, type);
-            });
-        }
-
-        // Paramètres de fonction
-        const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(trimmedLine);
-        if (funcMatch) {
-            let paramsString = funcMatch[2];
-
-            // Trouver la parenthèse fermante qui correspond à l'ouverture
-            let depth = 0;
-            let endOfParams = -1;
-            for (let i = 0; i < paramsString.length; i++) {
-                if (paramsString[i] === '(') depth++;
-                else if (paramsString[i] === ')') {
-                    depth--;
-                    if (depth < 0) {
-                        endOfParams = i;
-                        break;
-                    }
-                }
-            }
-
-            if (endOfParams !== -1) {
-                paramsString = paramsString.substring(0, endOfParams);
-            }
-
-            const params = smartSplitArgs(paramsString);
-            params.forEach(p => {
-                const parts = p.split(':').map(part => part.trim());
-                if (parts.length === 2) {
-                    const varName = parts[0].replace(REGEX_INOUT, '').trim();
-                    const rawTypeName = parts[1];
-                    const typeMatch = rawTypeName.match(REGEX_TYPE_NAME);
-                    if (typeMatch) {
-                        const typeName = typeMatch[1];
-                        const finalType = REGEX_BUILTIN_TYPES.test(typeName)
-                            ? normalizeType(typeName)
-                            : typeName;
-                        if (varName) variableTypes.set(varName, finalType);
-                    }
-                }
-            });
-        }
-    }
-    return variableTypes;
-}
-
 /**
  * Transpile le code Pseudo-Code en code Lua exécutable.
  * @param pscCode Le code source en Pseudo-Code.
  * @returns Le code Lua transpilé.
  */
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRÉ-CALCULS GLOBAUX (éviter le recalcul à chaque appel ou chaque ligne)
+// ═══════════════════════════════════════════════════════════════════════════════
+const SORTED_FUNCTIONS = [...PSC_DEFINITIONS.functions].sort((a, b) => b.name.length - a.name.length);
+const SPECIAL_STRING_FUNCTIONS = new Set(['longueur', 'concat', 'ième', 'souschaîne']);
+const DISALLOWED_PREV_WORDS = new Set(['if', 'elseif', 'while', 'for', 'return', 'function', 'local', 'not', 'then', 'do', 'else', 'écrire', 'ecrire', '__psc_write', 'lire']);
+
+// Pré-compilation des regex pour les fonctions non-mutateur, non-spéciales
+const FUNCTION_REPLACE_REGEXES = SORTED_FUNCTIONS
+    .filter(f => !f.isMutator && !SPECIAL_STRING_FUNCTIONS.has(f.name.toLowerCase()))
+    .map(f => ({
+        regex: new RegExp(`(?<![\\p{L}0-9_])${f.name}\\b`, 'giu'),
+        replacement: f.luaHelper
+    }));
+
 export function transpileToLua(pscCode: string): string {
     const functionRegistry = new FunctionRegistry();
     functionRegistry.collect(pscCode);
@@ -133,14 +73,14 @@ export function transpileToLua(pscCode: string): string {
     const compositeTypeRegistry = new CompositeTypeRegistry();
     compositeTypeRegistry.collect(pscCode);
 
-    const variableTypes = collectVariableTypes(pscCode);
 
+    REGEX_BLOCK_COMMENT.lastIndex = 0;
+    REGEX_LEXIQUE_BLOCK.lastIndex = 0;
     let cleanedCode = pscCode.replace(REGEX_BLOCK_COMMENT, '');
     cleanedCode = cleanedCode.replace(REGEX_LEXIQUE_BLOCK, '');
 
     let luaCode = '';
     const lines = cleanedCode.split('\n');
-    let isInsideAlgorithmBlock = false;
     const functionStack: any[] = [];
 
     // Convertit des parenthèses non appel de fonction en littéraux de liste: (x, y) -> __psc_liste_from_table({x, y})
@@ -153,9 +93,9 @@ export function transpileToLua(pscCode: string): string {
         const isDisallowedPrevWord = (prefix: string): boolean => {
             const m = prefix.match(/([\p{L}_][\p{L}0-9_]*)\s*$/u);
             const w = m ? m[1].toLowerCase() : '';
-            return new Set(['if', 'elseif', 'while', 'for', 'return', 'function', 'local', 'not', 'then', 'do', 'else']).has(w);
+            return DISALLOWED_PREV_WORDS.has(w);
         };
-        const hasTopLevelComma = (s: string): boolean => smartSplitArgs(s).length > 1;
+
         const isSimpleAtom = (s: string): boolean => {
             const t = s.trim();
             if (!t) return false;
@@ -243,11 +183,11 @@ export function transpileToLua(pscCode: string): string {
         // Ignorer les lignes vides et les lignes qui ne contiennent que des caractères de ponctuation résiduels
         if (trimmedLine === '' || /^[\/\*\s]*$/.test(trimmedLine)) continue;
 
-        if (REGEX_ALGORITHM.test(trimmedLine)) { isInsideAlgorithmBlock = true; continue; }
-        if (isInsideAlgorithmBlock) {
-            if (REGEX_FIN.test(trimmedLine)) isInsideAlgorithmBlock = false;
-            continue;
-        }
+        // Protéger les littéraux de chaînes pour éviter qu'un mot français dedans (ex: 'premier', 'sommet') ne soit remplacé
+        const { text: protectedText, strings: lineStrings } = protectStrings(trimmedLine);
+        trimmedLine = protectedText;
+
+        if (REGEX_ALGORITHM.test(trimmedLine)) continue;
         if (REGEX_DEBUT_OR_LEXIQUE.test(trimmedLine)) continue;
 
         // Ignorer les déclarations de types composites
@@ -305,12 +245,18 @@ export function transpileToLua(pscCode: string): string {
                         luaCode += `${indentation}\treturn ${funcInfo.inOutParamNames.join(', ')}\n`;
                     }
                 }
+                trimmedLine = 'end';
+                lineIsFullyProcessed = true;
+            } else if (REGEX_FIN.test(trimmedLine)) {
+                // Fin d'un algorithme principal (hors fonction) -> ne produit rien en Lua
+                continue;
+            } else {
+                trimmedLine = 'end';
+                lineIsFullyProcessed = true;
             }
-            trimmedLine = 'end';
-            lineIsFullyProcessed = true;
         }
         if (!lineIsFullyProcessed && REGEX_LIRE_ASSIGNMENT.test(trimmedLine)) {
-            const varName = trimmedLine.split('←')[0].trim();
+            const varName = trimmedLine.split(/(?:←|<-)/)[0].trim();
             // __psc_lire() gère automatiquement la conversion en nombre si possible
             trimmedLine = `${varName} = __psc_lire()`;
             lineIsFullyProcessed = true;
@@ -319,6 +265,16 @@ export function transpileToLua(pscCode: string): string {
         if (!lineIsFullyProcessed) {
             let isForLoop = false;
             trimmedLine = trimmedLine.replace(REGEX_SMART_QUOTES, '"');
+
+            // Normaliser les fonctions intégrées écrites avec des espaces
+            trimmedLine = trimmedLine
+                .replace(/\bfichier\s+ouvrir\b/giu, 'fichierouvrir')
+                .replace(/\bfichier\s+lire\b/giu, 'fichierlire')
+                .replace(/\bfichier\s+fermer\b/giu, 'fichierfermer')
+                .replace(/\bfichier\s+fin\b/giu, 'fichierfin')
+                .replace(/\bfichier\s+cr[eé]er\b/giu, 'fichiercreer')
+                .replace(/\bfichier\s+[eé]crire\b/giu, 'fichierecrire')
+                .replace(/\bcha[iî]ne\s+vers\s+entier\b/giu, 'chaineversentier');
 
             if (REGEX_FONCTION.test(trimmedLine)) {
                 const funcNameMatch = REGEX_FONCTION_NAME.exec(trimmedLine);
@@ -533,12 +489,10 @@ export function transpileToLua(pscCode: string): string {
 
             // Appliquer le mapping des fonctions PSC -> helpers Lua (incluant TDA Liste)
             // On trie par longueur décroissante pour éviter qu'un préfixe remplace un nom plus long
-            const sortedFunctions = [...PSC_DEFINITIONS.functions].sort((a, b) => b.name.length - a.name.length);
-
             // Traiter les fonctions mutateurs en premier (celles qui modifient le premier argument)
             const mutatorsHandled = new Set<string>();
 
-            for (const func of sortedFunctions) {
+            for (const func of SORTED_FUNCTIONS) {
                 if (func.isMutator) {
                     // Pattern pour capturer les appels de fonction mutateur
                     const funcCallRegex = new RegExp(`\\b(${func.name})\\s*\\(([^)]+)\\)`, 'giu');
@@ -575,17 +529,11 @@ export function transpileToLua(pscCode: string): string {
             }
 
             // Ensuite, remplacer les autres fonctions normalement
-            const specialStringFunctions = new Set(['longueur', 'concat', 'ième', 'souschaîne']);
-
-            for (const func of sortedFunctions) {
-                // Sauter si déjà traité comme mutateur ou fonction spéciale de chaîne
-                if (mutatorsHandled.has(func.name.toLowerCase()) || specialStringFunctions.has(func.name.toLowerCase())) {
-                    continue;
-                }
-
-                // Utiliser une regex qui respecte les frontières de mots pour éviter les remplacements partiels
-                const re = new RegExp(`(?<![\\p{L}0-9_])${func.name}\\b`, 'giu');
-                trimmedLine = trimmedLine.replace(re, func.luaHelper);
+            // Utiliser les regex pré-compilées pour les fonctions non-mutateur
+            for (const { regex, replacement } of FUNCTION_REPLACE_REGEXES) {
+                if (mutatorsHandled.has(replacement)) continue;
+                regex.lastIndex = 0;
+                trimmedLine = trimmedLine.replace(regex, replacement);
             }
 
             // Remplacements spécifiques pour les opérateurs et mots-clés
@@ -666,8 +614,8 @@ export function transpileToLua(pscCode: string): string {
             }
 
             trimmedLine = trimmedLine
-                .replace(/\s*←\s*/g, ' = ')
-                .replace(/lire\s*\(\)/gi, '__psc_lire()');
+                .replace(/\s*(?:←|<-)\s*/g, ' = ')
+                .replace(/(?<![\p{L}0-9_])lire\s*\(\)/giu, '__psc_lire()');
 
             // Nettoyer les marqueurs de table
             trimmedLine = trimmedLine.replace(/__PSC_TABLE_START__/g, '').replace(/__PSC_TABLE_END__/g, '');
@@ -708,10 +656,14 @@ export function transpileToLua(pscCode: string): string {
             trimmedLine = trimmedLine.replace(REGEX_ARRAY_LITERAL, '{$1}');
         }
 
-        if (REGEX_ECRIRE.test(trimmedLine)) {
-            const openParenIndex = trimmedLine.indexOf('(');
-            trimmedLine = '__psc_write' + trimmedLine.substring(openParenIndex);
+        // Traitement de 'écrire' / 'ecrire' (insensible à la casse avec/sans accents, avec ou sans parenthèses)
+        trimmedLine = trimmedLine.replace(/(?<![\p{L}0-9_])[eé]crire\s*\(/giu, '__psc_write(');
+        if (/^\s*[eé]crire\s+[^(]/iu.test(trimmedLine)) {
+            trimmedLine = trimmedLine.replace(/^\s*[eé]crire\s+(.+)$/iu, '__psc_write($1)');
         }
+
+        // Restaurer les chaînes littérales protégées
+        trimmedLine = restoreStrings(trimmedLine, lineStrings);
 
         const indentation = originalLineForIndentation.match(REGEX_INDENTATION)?.[0] || '';
         const finalComment = commentPart ? ' ' + commentPart.trim() : '';
@@ -720,25 +672,4 @@ export function transpileToLua(pscCode: string): string {
 
     const helpers = LUA_HELPERS;
     return helpers + luaCode;
-}
-
-export function executeCode(document: vscode.TextDocument) {
-    const pscCode = document.getText();
-    const luaCode = transpileToLua(pscCode);
-
-    console.log("--- Code Lua généré ---\n", luaCode, "\n--------------------------");
-
-    const tempDir = os.tmpdir();
-    const tempFilePath = path.join(tempDir, `psc_temp_${Date.now()}.lua`);
-    fs.writeFileSync(tempFilePath, luaCode);
-
-    const terminalName = "Pseudo-Code Execution";
-    let terminal = vscode.window.terminals.find(t => t.name === terminalName);
-    if (!terminal) {
-        terminal = vscode.window.createTerminal(terminalName);
-    }
-    terminal.show(true);
-
-    const command = `lua "${tempFilePath}"`;
-    terminal.sendText(command, true);
 }

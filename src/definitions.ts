@@ -10,7 +10,7 @@ export interface PscType {
 
 export interface PscFunction {
     name: string;
-    arity: number;
+    arity: number | number[];
     luaHelper: string;
     isMutator?: boolean; // Si vrai, l'appel est transformé en réaffectation du 1er argument (ex: ajout(l, v) -> l = ajout(l, v))
     description?: string;
@@ -88,13 +88,16 @@ export const PSC_DEFINITIONS = {
         { name: 'ième', arity: 2, luaHelper: 'string.sub', description: 'Caractère à la position i' }, // Traitement spécial
 
         // Fichiers
-        { name: 'fichierouvrir', arity: 2, luaHelper: '__psc_fichierOuvrir' },
-        { name: 'fichierfermer', arity: 1, luaHelper: '__psc_fichierFermer' },
-        { name: 'fichierlire', arity: 1, luaHelper: '__psc_fichierLire' },
-        { name: 'fichierfin', arity: 1, luaHelper: '__psc_fichierFin' },
-        { name: 'chaineversentier', arity: 1, luaHelper: '__psc_chaineVersEntier' },
-        { name: 'fichiercreer', arity: 1, luaHelper: '__psc_fichierCreer' },
-        { name: 'fichierecrire', arity: 2, luaHelper: '__psc_fichierEcrire' },
+        { name: 'fichierouvrir', arity: [1, 2], luaHelper: '__psc_fichierOuvrir', description: 'Ouvre un fichier en lecture ou écriture' },
+        { name: 'fichierfermer', arity: [0, 1], luaHelper: '__psc_fichierFermer', description: 'Ferme un fichier' },
+        { name: 'fichierlire', arity: [0, 1], luaHelper: '__psc_fichierLire', description: 'Lit une ligne ou valeur dans un fichier' },
+        { name: 'fichierfin', arity: [0, 1], luaHelper: '__psc_fichierFin', description: 'Indique si la fin du fichier est atteinte' },
+        { name: 'chaineversentier', arity: 1, luaHelper: '__psc_chaineVersEntier', description: 'Convertit une chaîne en entier' },
+        { name: 'fichiercreer', arity: 1, luaHelper: '__psc_fichierCreer', description: 'Crée un nouveau fichier' },
+        { name: 'fichierecrire', arity: 2, luaHelper: '__psc_fichierEcrire', description: 'Écrit dans un fichier' },
+
+        // Comparaison générale
+        { name: 'comparaison', arity: 2, luaHelper: '__psc_comparaison', description: 'Compare deux éléments (réels, chaînes, enregistrements/structures)' },
 
         // TDA Liste
         { name: 'tete', arity: 1, luaHelper: '__psc_generic_tete' },

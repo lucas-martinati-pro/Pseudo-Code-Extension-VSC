@@ -65,14 +65,14 @@
     },
     "keywords": {
       "name": "keyword.control",
-      "match": "(?i)\\b(si|alors|sinon|fsi|ftq|pour|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|Tant(?:\\s+que)|ftant)\\b"
+      "match": "(?i)\\b(si|alors|sinon|fsi|ftq|pour|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|Tant(?:\\s+que)|Sinon(?:\\s+si)|ftant)\\b"
     },
     "logical-operators": {
       "name": "keyword.control",
       "match": "(?i)\\b(et|ou|non|mod)\\b"
     },
     "for-loop": {
-      "begin": "(?i)\\b(Pour)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s+(de|allant\\s+de)\\b",
+      "begin": "(?i)\\b(Pour)\\s+([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s+(de|allant\\s+de)\\b",
       "beginCaptures": {
         "1": {
           "name": "keyword.control"
@@ -102,7 +102,7 @@
     },
     "support-functions": {
       "name": "support.function",
-      "match": "(?i)\\b(longueur|concat|souschaîne|ième|fichierouvrir|fichierfermer|fichierlire|fichierfin|chaineversentier|fichiercreer|fichierecrire|tete|val|suc|finliste|listevide|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|domaine|accestable|ajouttable|suppressiontable|changetable|estdans|écrire|lire)\\b"
+      "match": "(?i)\\b(longueur|concat|souschaîne|ième|fichierouvrir|fichierfermer|fichierlire|fichierfin|chaineversentier|fichiercreer|fichierecrire|comparaison|tete|val|suc|finliste|listevide|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|domaine|accestable|ajouttable|suppressiontable|changetable|estdans|écrire|lire)\\b"
     },
     "storage": {
       "patterns": [
@@ -116,7 +116,7 @@
         },
         {
           "name": "entity.name.type.declaration",
-          "match": "^\\s*([A-Z][a-zA-Z0-9_]*)\\s*=",
+          "match": "^\\s*([A-Z\\u00C0-\\u024F][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s*=",
           "captures": {
             "1": {
               "name": "entity.name.type"
@@ -129,14 +129,14 @@
         },
         {
           "name": "storage.type",
-          "match": "(?i)(?<=:)\\s*([A-Z][a-zA-Z0-9_]*)\\b(?!\\s*\\()"
+          "match": "(?i)(?<=:)\\s*([A-Z\\u00C0-\\u024F][a-zA-Z0-9\\u00C0-\\u024F_]*)\\b(?!\\s*\\()"
         }
       ]
     },
     "declarations": {
       "patterns": [
         {
-          "begin": "(?i)^\\s*(Fonction)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(\\()",
+          "begin": "(?i)^\\s*(Fonction)\\s+([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s*(\\()",
           "beginCaptures": {
             "1": {
               "name": "storage.modifier"
@@ -161,7 +161,7 @@
           ]
         },
         {
-          "match": "(?i)^\\s*(Algorithme)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "match": "(?i)^\\s*(Algorithme)(?:\\s+([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*))?",
           "captures": {
             "1": {
               "name": "storage.modifier"
@@ -174,7 +174,7 @@
       ]
     },
     "function-call": {
-      "match": "(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()",
+      "match": "(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)(?=\\s*\\()",
       "captures": {
         "1": {
           "name": "entity.name.function.call"
@@ -208,7 +208,7 @@
     },
     "operators-assignment": {
       "name": "keyword.operator.assignment",
-      "match": "(←)"
+      "match": "(←|→)"
     },
     "operators-arithmetic": {
       "name": "keyword.operator.arithmetic",
@@ -216,11 +216,11 @@
     },
     "operators-comparison": {
       "name": "keyword.operator.comparison",
-      "match": "(<=|>=|!=|<>|=/|=|<|>|\\.\\.)"
+      "match": "(≤|≥|≠|<=|>=|!=|<>|=/|=|<|>|\\.\\.)"
     },
     "variables": {
       "name": "variable.other",
-      "match": "(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)[a-zA-Z_][a-zA-Z0-9_]*\\b"
+      "match": "(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
     }
   },
   "_WARNING": "Ce fichier est généré automatiquement par scripts/generate-grammar.ts - NE PAS MODIFIER MANUELLEMENT - Modifier src/definitions.ts à la place"
