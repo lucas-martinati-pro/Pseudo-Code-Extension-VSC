@@ -34,10 +34,6 @@
   ],
   "license": "MIT",
   "main": "./out/extension.js",
-  "activationEvents": [
-    "onLanguage:psc",
-    "onCommand:psc.execute"
-  ],
   "contributes": {
     "languages": [
       {
