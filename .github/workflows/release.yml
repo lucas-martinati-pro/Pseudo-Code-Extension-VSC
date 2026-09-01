@@ -11,7 +11,7 @@ on:
         required: false
         type: string
       description:
-        description: 'Description personnalisée de la release (facultatif)'
+        description: 'Description personnalisée de la release (supporte le Markdown et les retours à la ligne)'
         required: false
         type: string
       draft:
@@ -54,12 +54,27 @@ jobs:
             echo "TAG_NAME=v$VERSION" >> $GITHUB_ENV
           fi
 
+      - name: Prepare Release Notes
+        env:
+          INPUT_DESC: ${{ github.event.inputs.description }}
+        run: |
+          if [ -n "$INPUT_DESC" ]; then
+            # Préserve les retours à la ligne réels et convertit les \n textuels
+            printf "%b\n" "$INPUT_DESC" > release_notes.md
+            echo "HAS_BODY=true" >> $GITHUB_ENV
+          elif [ -f "RELEASE_NOTES.md" ]; then
+            cp RELEASE_NOTES.md release_notes.md
+            echo "HAS_BODY=true" >> $GITHUB_ENV
+          else
+            echo "HAS_BODY=false" >> $GITHUB_ENV
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: Release ${{ env.TAG_NAME }}
-          body: ${{ github.event.inputs.description }}
+          body_path: ${{ env.HAS_BODY == 'true' && 'release_notes.md' || '' }}
           generate_release_notes: true
           draft: ${{ github.event.inputs.draft || false }}
           files: "*.vsix"
