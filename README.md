@@ -82,6 +82,43 @@ Lorsque vous tapez une ligne qui ouvre un bloc (comme `Pour ... Faire :`) et que
 
 ---
 
+## 📋 Prérequis (Pour l'exécution du code)
+
+Pour utiliser la fonctionnalité **d'exécution instantanée du code** (bouton ▶️), l'interpréteur **Lua** doit être installé sur votre système :
+
+### 🐧 Linux :
+* **Ubuntu / Debian / Linux Mint :**
+  ```bash
+  sudo apt update && sudo apt install lua5.3
+  # ou sudo apt install lua5.4
+  ```
+* **Arch Linux / Manjaro :**
+  ```bash
+  sudo pacman -S lua
+  ```
+* **Fedora / RHEL :**
+  ```bash
+  sudo dnf install lua
+  ```
+
+### 🍎 macOS :
+```bash
+brew install lua
+```
+
+### 🪟 Windows :
+```powershell
+# Via Winget
+winget install Lua.Lua
+
+# Ou via Chocolatey
+choco install lua
+```
+
+> 💡 **Remarque :** Si vous utilisez l'extension uniquement pour l'écriture de pseudo-code, la coloration syntaxique, le linter et le formatage, l'installation de Lua n'est pas requise.
+
+---
+
 ## 📦 Installation
 
 ### Option 1 : Visual Studio Code (Marketplace officiel)
