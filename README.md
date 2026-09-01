@@ -3,7 +3,9 @@
 [![Version](https://img.shields.io/visual-studio-marketplace/v/LucasM54.PseudoCode-Interpreter?style=for-the-badge&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=LucasM54.PseudoCode-Interpreter)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/LucasM54.PseudoCode-Interpreter?style=for-the-badge)](https://marketplace.visualstudio.com/items?itemName=LucasM54.PseudoCode-Interpreter)
 
-Cette extension transforme Visual Studio Code en un environnement de développement intégré (IDE) puissant et complet, spécialement conçu pour l'écriture et **l'exécution** de pseudo-code algorithmique en français. C'est l'outil idéal pour les étudiants, les enseignants et les développeurs qui souhaitent prototyper, apprendre, enseigner et **tester** leurs algorithmes avec une syntaxe claire et un outillage moderne.
+![Aperçu de l'extension Pseudo-Code](images/preview.png)
+
+Cette extension transforme Visual Studio Code et VSCodium en un environnement de développement intégré (IDE) puissant et complet, spécialement conçu pour l'écriture et **l'exécution** de pseudo-code algorithmique en français. C'est l'outil idéal pour les étudiants, les enseignants et les développeurs qui souhaitent prototyper, apprendre, enseigner et **tester** leurs algorithmes avec une syntaxe claire et un outillage moderne.
 
 [**Retrouvez l'extension sur la Marketplace Visual Studio Code !**](https://marketplace.visualstudio.com/items?itemName=LucasM54.PseudoCode-Interpreter)
 
@@ -18,6 +20,8 @@ Cette extension n'est pas un simple colorateur syntaxique. C'est une suite d'out
 -   **Bouton d'Exécution ▶️ :** Cliquez sur l'icône "Play" qui apparaît en haut à droite de vos fichiers `.psc` pour lancer votre code.
 -   **Résultats en direct :** La sortie de votre programme (via la fonction `écrire()`) s'affiche directement dans le terminal intégré de VS Code.
 -   **Aucune configuration requise :** L'extension s'occupe de tout en arrière-plan, en traduisant votre pseudo-code pour le rendre exécutable.
+
+![Démonstration de l'exécution](images/execution.png)
 
 ### 2. Coloration Syntaxique Avancée
 Le code est coloré de manière logique pour une lisibilité maximale :
@@ -78,17 +82,39 @@ Lorsque vous tapez une ligne qui ouvre un bloc (comme `Pour ... Faire :`) et que
 
 ---
 
-## Installation
+## 📦 Installation
 
-L'extension est disponible directement depuis la **Marketplace de Visual Studio Code**.
+### Option 1 : Visual Studio Code (Marketplace officiel)
 
-1.  Ouvrez **Visual Studio Code**.
-2.  Allez dans le panneau des **Extensions** (`Ctrl+Shift+X`).
-3.  Recherchez `PseudoCode-Interpreter`.
-4.  Cliquez sur **Installer**.
-5.  C'est tout ! Ouvrez un fichier `.psc` et commencez à coder.
+1. Ouvrez **Visual Studio Code**.
+2. Allez dans le panneau des **Extensions** (`Ctrl+Shift+X` / `Cmd+Shift+X`).
+3. Recherchez **`PseudoCode-Interpreter`**.
+4. Cliquez sur **Installer**.
 
-Vous pouvez également l'installer directement depuis la [page web de la Marketplace](https://marketplace.visualstudio.com/items?itemName=LucasM54.PseudoCode-Interpreter).
+👉 Vous pouvez également l'installer directement depuis la [Marketplace Visual Studio](https://marketplace.visualstudio.com/items?itemName=LucasM54.PseudoCode-Interpreter).
+
+---
+
+### Option 2 : VSCodium / Installation Manuelle (`.vsix`)
+
+VSCodium n'utilisant pas par défaut la marketplace propriétaire de Microsoft, vous pouvez installer l'extension directement via son fichier `.vsix` :
+
+#### Via l'interface graphique :
+1. Téléchargez le fichier **`.vsix`** de la dernière version sur la page des [Releases GitHub](https://github.com/LucasM548/Pseudo-Code-Extension-VSC/releases).
+2. Ouvrez **VSCodium** (ou VS Code).
+3. Ouvrez le panneau des **Extensions** (`Ctrl+Shift+X`).
+4. Cliquez sur le menu avec les trois petits points **`···`** (en haut à droite du panneau Extensions).
+5. Choisissez **"Installer depuis un VSIX..."** (*"Install from VSIX..."*).
+6. Sélectionnez le fichier `.vsix` que vous venez de télécharger.
+
+#### Via le terminal (Ligne de commande) :
+```bash
+# Pour VSCodium
+codium --install-extension pseudocode-interpreter-0.3.0.vsix
+
+# Pour VS Code
+code --install-extension pseudocode-interpreter-0.3.0.vsix
+```
 
 ---
 
