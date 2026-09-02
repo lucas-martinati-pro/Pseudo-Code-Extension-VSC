@@ -8,12 +8,15 @@ import { extractFunctionParams, isSimpleIdentifier } from './utils';
 export interface ParamInfo {
     name: string;
     isInOut: boolean;
+    arrayStartIndex?: number;
 }
 
 export interface FunctionInfo {
     name: string;
     params: ParamInfo[];
     inOutParamNames: string[];
+    /** Map de nom de paramètre tableau → indice de départ (0 par défaut) */
+    arrayParamStartIndices: Map<string, number>;
 }
 
 /**
@@ -39,10 +42,19 @@ export class FunctionRegistry {
                     .filter(p => p.isInOut)
                     .map(p => p.name);
 
+                // Collecter les indices de départ des paramètres tableau
+                const arrayParamStartIndices = new Map<string, number>();
+                for (const p of params) {
+                    if (p.arrayStartIndex !== undefined) {
+                        arrayParamStartIndices.set(p.name, p.arrayStartIndex);
+                    }
+                }
+
                 this.functions.set(name, {
                     name,
                     params,
-                    inOutParamNames
+                    inOutParamNames,
+                    arrayParamStartIndices
                 });
             }
         }

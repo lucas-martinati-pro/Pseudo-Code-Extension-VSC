@@ -631,21 +631,47 @@ export function transpileToLua(pscCode: string): string {
             });
 
             // 1) Convertir les accès multidimensionnels: a[i][j] -> a[(i)+1][(j)+1]
+            //    SAUF si le tableau est un paramètre de fonction avec un indice de départ personnalisé
             REGEX_MULTI_BRACKET.lastIndex = 0;
+            const currentFuncForArrayOffset = functionStack.length > 0 ? functionStack[functionStack.length - 1] : null;
             trimmedLine = trimmedLine.replace(REGEX_MULTI_BRACKET, (m, name, brackets) => {
                 const parts: string[] = [];
                 REGEX_BRACKET_EXTRACT.lastIndex = 0;
                 let mm: RegExpExecArray | null;
+
+                // Déterminer l'offset pour cette variable
+                let startIndex = 0; // Par défaut, tableau PSC commence à 0
+                if (currentFuncForArrayOffset && currentFuncForArrayOffset.arrayParamStartIndices) {
+                    const paramStart = currentFuncForArrayOffset.arrayParamStartIndices.get(name);
+                    if (paramStart !== undefined) {
+                        startIndex = paramStart;
+                    }
+                }
+
                 while ((mm = REGEX_BRACKET_EXTRACT.exec(brackets)) !== null) {
                     const expr = (mm[1] || '').trim();
                     const indices = smartSplitArgs(expr);
                     if (indices.length > 1) {
                         for (const idx of indices) {
                             const id = (idx || '').trim();
-                            if (id) parts.push(`[(${id}) + 1]`);
+                            if (id) {
+                                if (startIndex === 1) {
+                                    parts.push(`[(${id})]`);
+                                } else if (startIndex === 0) {
+                                    parts.push(`[(${id}) + 1]`);
+                                } else {
+                                    parts.push(`[(${id}) - ${startIndex} + 1]`);
+                                }
+                            }
                         }
                     } else {
-                        parts.push(`[(${expr}) + 1]`);
+                        if (startIndex === 1) {
+                            parts.push(`[(${expr})]`);
+                        } else if (startIndex === 0) {
+                            parts.push(`[(${expr}) + 1]`);
+                        } else {
+                            parts.push(`[(${expr}) - ${startIndex} + 1]`);
+                        }
                     }
                 }
                 return name + parts.join('');

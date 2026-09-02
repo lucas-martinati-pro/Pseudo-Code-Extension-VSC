@@ -226,8 +226,9 @@ export function isSimpleIdentifier(identifier: string): boolean {
 /**
  * Extrait les paramètres d'une signature de fonction
  * OPTIMISÉ: Boucle for-of et regex pré-compilée
+ * Détecte aussi les indices de départ de tableaux dans la syntaxe: tableau type[x .. ...]
  */
-export function extractFunctionParams(paramsString: string): Array<{ name: string; isInOut: boolean }> {
+export function extractFunctionParams(paramsString: string): Array<{ name: string; isInOut: boolean; arrayStartIndex?: number }> {
     const trimmed = paramsString.trim();
     if (!trimmed) return [];
 
@@ -249,18 +250,30 @@ export function extractFunctionParams(paramsString: string): Array<{ name: strin
 
     const paramStr = endOfParams !== -1 ? paramsString.substring(0, endOfParams) : paramsString;
     const parts = smartSplitArgs(paramStr);
-    const params: Array<{ name: string; isInOut: boolean }> = [];
+    const params: Array<{ name: string; isInOut: boolean; arrayStartIndex?: number }> = [];
 
     for (const part of parts) {
         const colonIdx = part.indexOf(':');
         const namePart = colonIdx !== -1 ? part.substring(0, colonIdx).trim() : part.trim();
+        const typePart = colonIdx !== -1 ? part.substring(colonIdx + 1).trim() : '';
         const isInOut = REGEX_INOUT.test(namePart);
         const name = namePart.replace(REGEX_INOUT, '').trim();
 
+        // Détecter l'indice de départ pour les paramètres tableau
+        // Syntaxe: tableau type[x .. (...)] où x est un entier littéral
+        let arrayStartIndex: number | undefined;
+        if (typePart) {
+            const arrayStartMatch = /\btableau\b.*\[\s*(\d+)\s*\.\./i.exec(typePart);
+            if (arrayStartMatch) {
+                arrayStartIndex = parseInt(arrayStartMatch[1], 10);
+            }
+        }
+
         if (name) {
-            params.push({ name, isInOut });
+            params.push({ name, isInOut, arrayStartIndex });
         }
     }
 
     return params;
 }
+
