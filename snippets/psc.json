@@ -131,5 +131,74 @@
       "retourner ${1:valeur}"
     ],
     "description": "Retourne une valeur depuis une fonction."
+  },
+  "Sinon": {
+    "prefix": "sinon",
+    "body": [
+      "Sinon :",
+      "\t$0"
+    ],
+    "description": "Branche alternative (Sinon)."
+  },
+  "Sinon si": {
+    "prefix": "sinonsi",
+    "body": [
+      "Sinon si ${1:condition} Alors :",
+      "\t$0"
+    ],
+    "description": "Branche conditionnelle alternative (Sinon si)."
+  },
+  "Lexique": {
+    "prefix": "lexique",
+    "body": [
+      "/*",
+      "Lexique :",
+      "${1:variable} : ${2:type}",
+      "*/"
+    ],
+    "description": "Bloc Lexique pour déclarer les variables."
+  },
+  "Fichier ouvrir/lire/fermer": {
+    "prefix": "fichier",
+    "body": [
+      "${1:handle} ← fichierOuvrir(${2:\"fichier.txt\"})",
+      "Tant que non fichierFin(${1:handle}) Faire :",
+      "\t${3:ligne} ← fichierLire(${1:handle})",
+      "\t$0",
+      "ftq",
+      "fichierFermer(${1:handle})"
+    ],
+    "description": "Lecture complète d'un fichier (ouvrir, lire ligne par ligne, fermer)."
+  },
+  "Affectation lire": {
+    "prefix": "saisie",
+    "body": [
+      "écrire(\"${1:Entrez une valeur : }\")",
+      "${2:variable} ← lire()"
+    ],
+    "description": "Saisie utilisateur avec message."
+  },
+  "Pour itérer tableau": {
+    "prefix": "pourtab",
+    "body": [
+      "Pour ${1:i} de ${2:0} à ${3:n-1} Faire :",
+      "\t${4:tab}[${1:i}] ← $0",
+      "fpour"
+    ],
+    "description": "Boucle Pour pour parcourir un tableau."
+  },
+  "Fonction récursive": {
+    "prefix": "foncrec",
+    "body": [
+      "Fonction ${1:nomFonction}(${2:n} : ${3:entier}) : ${4:entier}",
+      "Début",
+      "\tSi (${2:n} = ${5:0}) Alors :",
+      "\t\tretourner ${6:1}",
+      "\tSinon :",
+      "\t\tretourner ${7:${2:n} * ${1:nomFonction}(${2:n}-1)}",
+      "\tfsi",
+      "Fin"
+    ],
+    "description": "Structure de fonction récursive avec cas de base."
   }
 }

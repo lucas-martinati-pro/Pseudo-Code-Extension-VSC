@@ -29,7 +29,7 @@
       "end": "(?i)^\\s*(Fin|fsi|fpour|ftq|ftant)\\b"
     }
   },
-  "wordPattern": "[\\p{L}_][\\p{L}0-9_]*",
+  "wordPattern": "(-?\\d*\\.\\d\\w*)|([^\\`\\~\\!\\@\\#\\%\\^\\&\\*\\(\\)\\-\\=\\+\\[\\{\\]\\}\\\\\\|\\;\\:\\'\\\"\\,\\.\\<\\>\\/\\?\\s]+)",
   "indentationRules": {
     "increaseIndentPattern": "(?i)^\\s*(Début|.*(?:Alors|Faire)\\s*:|Sinon(?:\\s+si\\b.*Alors)?\\s*:?)\\s*$",
     "decreaseIndentPattern": "(?i)^\\s*(Fin|fsi|fpour|ftq|ftant|Sinon)\\b"

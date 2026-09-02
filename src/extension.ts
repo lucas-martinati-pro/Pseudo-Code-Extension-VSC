@@ -3,6 +3,7 @@ import { formatDocument } from './formatter';
 import { executeCode, cleanOldTempFiles } from './services/runner';
 import { linter } from './services/linter';
 import { handleSymbolReplacement as handleSymbolReplacementImpl } from './autoEdits/symbols';
+import { PscCompletionProvider, PscSignatureHelpProvider, PscHoverProvider, PscDefinitionProvider } from './completionProvider';
 
 // Une "collection de diagnostics" est le conteneur de VS Code pour toutes nos erreurs
 const diagnosticsCollection = vscode.languages.createDiagnosticCollection('psc');
@@ -18,6 +19,36 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
     context.subscriptions.push(formattingProvider);
+
+    // --- AUTOCOMPLÉTION INTELLIGENTE ---
+    const completionProvider = vscode.languages.registerCompletionItemProvider(
+        'psc',
+        new PscCompletionProvider(),
+        '.', ':', '('
+    );
+    context.subscriptions.push(completionProvider);
+
+    // --- AIDE À LA SIGNATURE (paramètres de fonctions) ---
+    const signatureProvider = vscode.languages.registerSignatureHelpProvider(
+        'psc',
+        new PscSignatureHelpProvider(),
+        { triggerCharacters: ['(', ','], retriggerCharacters: [','] }
+    );
+    context.subscriptions.push(signatureProvider);
+
+    // --- INFO AU SURVOL (Hover) ---
+    const hoverProvider = vscode.languages.registerHoverProvider(
+        'psc',
+        new PscHoverProvider()
+    );
+    context.subscriptions.push(hoverProvider);
+
+    // --- ALLER À LA DÉFINITION (Ctrl+Clic) ---
+    const definitionProvider = vscode.languages.registerDefinitionProvider(
+        'psc',
+        new PscDefinitionProvider()
+    );
+    context.subscriptions.push(definitionProvider);
 
     // --- GESTION DE L'ANALYSE (DIAGNOSTICS) ---
     if (vscode.window.activeTextEditor) {

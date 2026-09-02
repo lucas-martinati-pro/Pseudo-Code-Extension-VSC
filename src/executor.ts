@@ -282,7 +282,13 @@ export function transpileToLua(pscCode: string): string {
                     const funcInfo = functionRegistry.get(funcNameMatch[1])!;
                     functionStack.push(funcInfo);
                     const paramNames = funcInfo.params.map(p => p.name).join(', ');
-                    trimmedLine = `function ${funcInfo.name}(${paramNames})`;
+                    const indentation = originalLineForIndentation.match(REGEX_INDENTATION)?.[0] || '';
+                    let funcHeader = `function ${funcInfo.name}(${paramNames})`;
+                    if (funcInfo.localVars && funcInfo.localVars.length > 0) {
+                        funcHeader += `\n${indentation}\tlocal ${funcInfo.localVars.join(', ')}`;
+                    }
+                    trimmedLine = funcHeader;
+                    lineIsFullyProcessed = true;
                 }
             } else {
                 // Match function calls with proper nested parenthesis handling

@@ -106,6 +106,21 @@
           "group": "navigation"
         }
       ]
+    },
+    "configurationDefaults": {
+      "[psc]": {
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "off"
+        },
+        "editor.suggest.showSnippets": true,
+        "editor.snippetSuggestions": "top",
+        "editor.suggest.insertMode": "replace",
+        "editor.wordBasedSuggestions": "off",
+        "editor.suggest.localityBonus": true,
+        "editor.acceptSuggestionOnCommitCharacter": true
+      }
     }
   },
   "scripts": {
