@@ -105,6 +105,8 @@ export const PSC_DEFINITIONS = {
         { name: 'suc', arity: 2, luaHelper: '__psc_liste_suc' },
         { name: 'finliste', arity: 2, luaHelper: '__psc_liste_fin' },
         { name: 'listevide', arity: 0, luaHelper: '__psc_liste_vide' },
+        { name: 'longueurliste', arity: 1, luaHelper: '__psc_liste_longueur', description: 'Longueur de la liste' },
+        { name: 'acces', arity: 2, luaHelper: '__psc_liste_acces', description: 'Accès au i-ème élément de la liste' },
         { name: 'ajoutteteliste', arity: 2, luaHelper: '__psc_liste_ajout_tete', isMutator: true },
         { name: 'suppressionteteliste', arity: 1, luaHelper: '__psc_liste_suppression_tete', isMutator: true },
         { name: 'ajoutqueueliste', arity: 2, luaHelper: '__psc_liste_ajout_queue', isMutator: true },
@@ -112,6 +114,7 @@ export const PSC_DEFINITIONS = {
         { name: 'ajoutliste', arity: 3, luaHelper: '__psc_liste_ajout', isMutator: true },
         { name: 'suppressionliste', arity: 2, luaHelper: '__psc_liste_suppression', isMutator: true },
         { name: 'changeliste', arity: 3, luaHelper: '__psc_liste_change', isMutator: true },
+        { name: 'change', arity: 3, luaHelper: '__psc_liste_change', isMutator: true },
 
         // TDA ListeSym
         { name: 'tetels', arity: 1, luaHelper: '__psc_listesym_tete' },
@@ -121,7 +124,7 @@ export const PSC_DEFINITIONS = {
         { name: 'precls', arity: 2, luaHelper: '__psc_listesym_prec' },
         { name: 'finls', arity: 2, luaHelper: '__psc_listesym_fin' },
         { name: 'videls', arity: 0, luaHelper: '__psc_listesym_vide' },
-        { name: 'ajouttetels', arity: 2, luaHelper: '__psc_listesym_ajout_tete' }, // Mutator implicite par référence en Lua pour tables, mais on peut le marquer si on veut forcer la réassignation (pas nécessaire pour ListeSym car mutable par ref)
+        { name: 'ajouttetels', arity: 2, luaHelper: '__psc_listesym_ajout_tete' },
         { name: 'suppressiontetels', arity: 1, luaHelper: '__psc_listesym_suppression_tete' },
         { name: 'ajoutqueuels', arity: 2, luaHelper: '__psc_listesym_ajout_queue' },
         { name: 'suppressionqueuels', arity: 1, luaHelper: '__psc_listesym_suppression_queue' },
@@ -135,6 +138,7 @@ export const PSC_DEFINITIONS = {
         { name: 'estvidepile', arity: 1, luaHelper: '__psc_pile_est_vide' },
         { name: 'empiler', arity: 2, luaHelper: '__psc_pile_empiler' },
         { name: 'depiler', arity: 1, luaHelper: '__psc_pile_depiler' },
+        { name: 'estvide', arity: 1, luaHelper: '__psc_pile_est_vide' }, // Alias générique
 
         // TDA File
         { name: 'filevide', arity: 0, luaHelper: '__psc_file_vide' },
@@ -148,7 +152,9 @@ export const PSC_DEFINITIONS = {
 
         // TDA Table (Dictionnaire/Map: Clé -> Valeur)
         { name: 'tablevide', arity: 0, luaHelper: '__psc_table_vide' },
+        { name: 'table', arity: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], luaHelper: '__psc_table_from_pairs', description: 'Constructeur de table avec paires clé-valeur' },
         { name: 'domaine', arity: 1, luaHelper: '__psc_table_domaine' },
+        { name: 'domainetable', arity: 1, luaHelper: '__psc_table_domaine', description: 'Ensemble des clés de la table' },
         { name: 'accestable', arity: 2, luaHelper: '__psc_table_acces' },
         { name: 'ajouttable', arity: 3, luaHelper: '__psc_table_ajout', isMutator: true },
         { name: 'suppressiontable', arity: 2, luaHelper: '__psc_table_suppression', isMutator: true },

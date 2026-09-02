@@ -83,9 +83,10 @@ export function transpileToLua(pscCode: string): string {
 
     const DISALLOWED_ARRAY_TARGETS = new Set([
         'retourner', 'retourne', 'return',
+        'afficher', 'ecrire', 'écrire', 'lire',
         'dans', 'in',
         'et', 'ou', 'non', 'mod',
-        'si', 'alors', 'sinon', 'faire',
+        'si', 'alors', 'sinon', 'faire', 'cas',
         'pour', 'allant', 'de', 'à', 'a', 'pas', 'décroissant', 'decroissant',
         'tant', 'que',
         'début', 'debut', 'fin', 'algorithme', 'lexique',
@@ -100,6 +101,7 @@ export function transpileToLua(pscCode: string): string {
      * - Les chaînes de caractères ("texte [0]", a["]"])
      * - Les mots-clés devant un littéral (retourner [1, 2])
      * - Les dimensions multiples avec offsets hétérogènes (M[i, j] sur M[1..10, 0..20])
+     * - Les propriétés d'objets (obj.liste[i])
      */
     const transformArrayAccesses = (
         line: string,
@@ -153,9 +155,15 @@ export function transpileToLua(pscCode: string): string {
                             startName--;
                         }
                         targetName = result.slice(startName + 1, prevIdx + 1);
+
+                        // Si précédé d'un point, c'est une propriété (ex: obj.liste[i]) -> pas un mot-clé
+                        const isMemberAccess = startName >= 0 && result[startName] === '.';
+                        if (isMemberAccess) {
+                            targetName = ''; // Force l'autorisation
+                        }
                     }
 
-                    const isDisallowedKeyword = targetName && DISALLOWED_ARRAY_TARGETS.has(targetName.toLowerCase());
+                    const isDisallowedKeyword = Boolean(targetName && DISALLOWED_ARRAY_TARGETS.has(targetName.toLowerCase()));
 
                     if (!isDisallowedKeyword) {
                         const bracketsContent: string[] = [];
@@ -355,8 +363,21 @@ export function transpileToLua(pscCode: string): string {
         if (REGEX_ALGORITHM.test(trimmedLine)) continue;
         if (REGEX_DEBUT_OR_LEXIQUE.test(trimmedLine)) continue;
 
-        // Ignorer les déclarations de types composites
-        if (PATTERNS.COMPOSITE_TYPE.test(trimmedLine)) continue;
+        // Transformer les déclarations de types composites en constructeur Lua
+        const compositeMatch = PATTERNS.COMPOSITE_TYPE.exec(trimmedLine);
+        if (compositeMatch) {
+            const typeName = compositeMatch[1];
+            const fieldsStr = compositeMatch[2];
+            const fields = smartSplitArgs(fieldsStr).map(f => {
+                const colonIdx = f.indexOf(':');
+                return (colonIdx !== -1 ? f.substring(0, colonIdx) : f).trim();
+            }).filter(f => f.length > 0);
+            
+            const params = fields.join(', ');
+            const tableFields = fields.map(f => `${f} = ${f}`).join(', ');
+            luaCode += `function ${typeName}(${params})\n\treturn { _type = '${typeName}', ${tableFields} }\nend\n`;
+            continue;
+        }
 
         // Transformer les déclarations de tableaux en initialisation Lua
         const arrayDecl = REGEX_ARRAY_DECL.exec(trimmedLine);
@@ -392,10 +413,10 @@ export function transpileToLua(pscCode: string): string {
                     const hi = ranges[idx].hi;
                     let start: string;
                     let finish: string;
-                    if (lo === '1' || lo === '1') {
-                        start = `(${lo})`;
+                    if (lo === '1' || (lo as any) === 1) {
+                        start = '1';
                         finish = `(${hi})`;
-                    } else if (lo === '0') {
+                    } else if (lo === '0' || (lo as any) === 0) {
                         start = '1';
                         finish = `((${hi})) + 1`;
                     } else {
@@ -700,7 +721,7 @@ export function transpileToLua(pscCode: string): string {
                             const firstArg = args[0].trim();
                             // Vérifier si ce n'est pas déjà une affectation
                             const beforeCall = trimmedLine.substring(0, match.index);
-                            const isAlreadyAssignment = /[\w\s,]+\s*=\s*$/.test(beforeCall);
+                            const isAlreadyAssignment = /[\w\s,]+\s*(?:=|←|<-)\s*$/u.test(beforeCall);
 
                             if (!isAlreadyAssignment && !/^\s*(if|while|elseif|return)\b/i.test(trimmedLine)) {
                                 // Transformer en affectation: firstArg = func(firstArg, ...)
@@ -785,26 +806,84 @@ export function transpileToLua(pscCode: string): string {
                 });
 
                 if (!handledCondition) {
+                    const safeEqualReplace = (str: string): string => {
+                        let res = '';
+                        let i = 0;
+                        while (i < str.length) {
+                            // 1. Sauter les tables protégées
+                            if (str.startsWith('__PSC_TABLE_START__', i)) {
+                                const endIdx = str.indexOf('__PSC_TABLE_END__', i);
+                                if (endIdx !== -1) {
+                                    res += str.slice(i, endIdx + '__PSC_TABLE_END__'.length);
+                                    i = endIdx + '__PSC_TABLE_END__'.length;
+                                    continue;
+                                }
+                            }
+
+                            // 2. Sauter les chaînes littérales (ne pas corrompre les '=' dedans)
+                            const ch = str[i];
+                            if (ch === '"' || ch === "'") {
+                                const quote = ch;
+                                res += ch;
+                                i++;
+                                while (i < str.length) {
+                                    const c = str[i];
+                                    res += c;
+                                    if (c === '\\') {
+                                        if (i + 1 < str.length) {
+                                            i++;
+                                            res += str[i];
+                                        }
+                                    } else if (c === quote) {
+                                        break;
+                                    }
+                                    i++;
+                                }
+                                i++;
+                                continue;
+                            }
+
+                            // 3. Traiter le '=' isolé comme une comparaison '=='
+                            if (ch === '=') {
+                                const prevChar = i > 0 ? str[i - 1] : '';
+                                const nextChar = i + 1 < str.length ? str[i + 1] : '';
+                                const isComparisonOrAssign = /^[<>=~]$/.test(prevChar) || nextChar === '=';
+                                if (!isComparisonOrAssign) {
+                                    res += '==';
+                                } else {
+                                    res += '=';
+                                }
+                                i++;
+                                continue;
+                            }
+
+                            res += ch;
+                            i++;
+                        }
+                        return res;
+                    };
+
                     const isReturnLine = REGEX_RETURN_LINE.test(trimmedLine);
-                    const parts = trimmedLine.split(/(__PSC_TABLE_START__|__PSC_TABLE_END__)/g);
-                    for (let i = 0; i < parts.length; i += 4) {
-                        if (isReturnLine) {
-                            // Dans une expression de retour, '=' est toujours une comparaison
-                            parts[i] = parts[i].replace(/([^<>=~])=(?!=)/g, '$1==');
+                    const isWriteCall = /^(?:écrire|ecrire|__psc_write)\b/iu.test(trimmedLine);
+
+                    if (isReturnLine || isWriteCall) {
+                        trimmedLine = safeEqualReplace(trimmedLine);
+                    } else {
+                        // Si la ligne commence par une affectation (supportant variables, tableaux et propriétés d'objets)
+                        const assignMatch = trimmedLine.match(/^(\s*[\p{L}_][\p{L}0-9_]*(?:\[[^\]]*\]|\.[\p{L}_][\p{L}0-9_]*)*\s*)(?:←|<-|=)\s*(.+)$/u);
+                        if (assignMatch) {
+                            const lhs = assignMatch[1];
+                            const rhs = safeEqualReplace(assignMatch[2]);
+                            trimmedLine = `${lhs}__PSC_ROOT_ASSIGN__ ${rhs}`;
                         } else {
-                            // Protéger les affectations générées (ex: l = __psc_liste_...)
-                            parts[i] = parts[i].replace(/(\s)=(\s)/g, '$1__PSC_ASSIGN__$2');
-                            // Convertir les comparaisons '=' en '==' (sans lookbehind)
-                            parts[i] = parts[i].replace(/([^<>=~])=(?!=)/g, '$1==');
-                            // Restaurer les affectations
-                            parts[i] = parts[i].replace(/__PSC_ASSIGN__/g, '=');
+                            trimmedLine = safeEqualReplace(trimmedLine);
                         }
                     }
-                    trimmedLine = parts.join('');
                 }
             }
 
             trimmedLine = trimmedLine
+                .replace(/__PSC_ROOT_ASSIGN__/g, '=')
                 .replace(/\s*(?:←|<-)\s*/g, ' = ')
                 .replace(/(?<![\p{L}0-9_])lire\s*\(\)/giu, '__psc_lire()');
 

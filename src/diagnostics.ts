@@ -124,7 +124,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const trimmedText = nonCommentText.text.trim();
         inBlockComment = nonCommentText.inBlockComment;
 
-        if (trimmedText === '') continue;
+        if (trimmedText === '' || /^\s*Algorithme\b/i.test(trimmedText) || /^\s*Lexique\b/i.test(trimmedText)) continue;
 
         // Ignorer les déclarations de types composites
         if (PATTERNS.COMPOSITE_TYPE.test(trimmedText)) continue;
@@ -279,18 +279,23 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         }
 
         const declarationMatch = PATTERNS.VARIABLE_DECLARATION.exec(trimmedText);
-        const assignmentIndex = trimmedText.indexOf('←');
+        
+        // Détecter les affectations (←, <-, =)
+        let assignMatch = trimmedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*(?:←|<-)\s*(.+)$/u);
+        if (!assignMatch && !REGEX_OPEN_SI.test(trimmedText) && !REGEX_OPEN_TANT_QUE.test(trimmedText) && !REGEX_OPEN_POUR.test(trimmedText) && !PATTERNS.FUNCTION_DECLARATION.test(trimmedText)) {
+            assignMatch = trimmedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*=\s*([^=].*)$/u);
+        }
 
-        if (declarationMatch && !PATTERNS.FUNCTION_DECLARATION.test(trimmedText)) {
+        if (declarationMatch && !PATTERNS.FUNCTION_DECLARATION.test(trimmedText) && !assignMatch) {
             const varNames = declarationMatch[1].split(',');
             const currentScope = scopeStack[scopeStack.length - 1];
             for (const v of varNames) {
                 const trimmed = v.trim();
                 if (trimmed) currentScope.add(trimmed);
             }
-        } else if (assignmentIndex !== -1) {
-            const lhsText = trimmedText.substring(0, assignmentIndex).trim();
-            const rhsText = trimmedText.substring(assignmentIndex + 1).trim();
+        } else if (assignMatch) {
+            const lhsText = assignMatch[1].trim();
+            const rhsText = assignMatch[2].trim();
             checkVariablesInExpression(rhsText, scopeStack, declaredFunctions, declaredCompositeTypes, line, diagnostics);
             checkFunctionCallsInExpression(rhsText, declaredFunctions, declaredCompositeTypes, line, diagnostics);
 

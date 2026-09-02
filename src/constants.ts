@@ -426,6 +426,61 @@ local function __psc_serialize(v)
     end
 end
 
+local function concat(...)
+    local n = select("#", ...)
+    local res = ""
+    for i = 1, n do
+        local v = select(i, ...)
+        res = res .. tostring(v)
+    end
+    return res
+end
+
+local function longueur(s)
+    if type(s) == 'table' then
+        return #s
+    elseif type(s) == 'string' then
+        return #s
+    end
+    return 0
+end
+
+local function ieme(s, i)
+    if type(s) == 'string' then
+        return string.sub(s, i, i)
+    end
+    return ""
+end
+
+local function souschaine(s, i, j)
+    if type(s) == 'string' then
+        return string.sub(s, i, j)
+    end
+    return ""
+end
+
+local function __psc_liste_longueur(l)
+    local count = 0
+    local node = l
+    while node ~= nil do
+        count = count + 1
+        node = node.suc
+    end
+    return count
+end
+
+local function __psc_liste_acces(l, i)
+    if not i or i < 1 then return nil end
+    local node = l
+    local idx = i - 1
+    while node ~= nil and idx > 0 do
+        node = node.suc
+        idx = idx - 1
+    end
+    if node ~= nil then return node.val end
+    return nil
+end
+
 local function __psc_write(...)
     local n = select("#", ...)
     if n == 0 then
@@ -857,6 +912,62 @@ local function __psc_table_from_pairs(...)
 end
 
 -- =================================================================================================================
+-- Alias globaux pour compatibilité directe avec les cours
+-- =================================================================================================================
+local ajoutTeteListe = __psc_liste_ajout_tete
+local ajoutQueueListe = __psc_liste_ajout_queue
+local ajoutListe = __psc_liste_ajout
+local suppressionTeteListe = __psc_liste_suppression_tete
+local suppressionQueueListe = __psc_liste_suppression_queue
+local suppressionListe = __psc_liste_suppression
+local listeVide = __psc_liste_vide
+local tete = __psc_generic_tete
+local teteListe = __psc_liste_tete
+local val = __psc_liste_val
+local suc = __psc_liste_suc
+local finListe = __psc_liste_fin
+local change = __psc_liste_change
+local longueurListe = __psc_liste_longueur
+local longueurliste = __psc_liste_longueur
+local acces = __psc_liste_acces
+
+local pileVide = __psc_pile_vide
+local empiler = __psc_pile_empiler
+local depiler = __psc_pile_depiler
+local sommet = __psc_pile_sommet
+local estVidePile = __psc_pile_est_vide
+
+local fileVide = __psc_file_vide
+local enfiler = __psc_file_enfiler
+local ajoutFile = __psc_file_enfiler
+local defiler = __psc_file_defiler
+local suppressionFile = __psc_file_defiler
+local premier = __psc_file_premier
+local teteFile = __psc_file_premier
+local estVideFile = __psc_file_est_vide
+
+local videLS = __psc_listesym_vide
+local teteLS = __psc_listesym_tete
+local queueLS = __psc_listesym_queue
+local valLS = __psc_listesym_val
+local sucLS = __psc_listesym_suc
+local precLS = __psc_listesym_prec
+local finLS = __psc_listesym_fin
+local ajoutTeteLS = __psc_listesym_ajout_tete
+local ajoutQueueLS = __psc_listesym_ajout_queue
+local suppressionTeteLS = __psc_listesym_suppression_tete
+local suppressionQueueLS = __psc_listesym_suppression_queue
+local suppressionLS = __psc_listesym_suppression
+local changeLS = __psc_listesym_change
+
+local tableVide = __psc_table_vide
+local ajoutTable = __psc_table_ajout
+local suppressionTable = __psc_table_suppression
+local changeTable = __psc_table_change
+local accesTable = __psc_table_acces
+local domaineTable = __psc_table_domaine
+local estDans = __psc_ensemble_estdans
+
 -- =================================================================================================================
 -- =================================================================================================================
 
