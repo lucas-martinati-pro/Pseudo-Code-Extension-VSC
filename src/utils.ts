@@ -228,7 +228,7 @@ export function isSimpleIdentifier(identifier: string): boolean {
  * OPTIMISÉ: Boucle for-of et regex pré-compilée
  * Détecte aussi les indices de départ de tableaux dans la syntaxe: tableau type[x .. ...]
  */
-export function extractFunctionParams(paramsString: string): Array<{ name: string; isInOut: boolean; arrayStartIndex?: number }> {
+export function extractFunctionParams(paramsString: string): Array<{ name: string; isInOut: boolean; arrayStartIndex?: number; arrayStartIndices?: Array<string | number> }> {
     const trimmed = paramsString.trim();
     if (!trimmed) return [];
 
@@ -250,7 +250,7 @@ export function extractFunctionParams(paramsString: string): Array<{ name: strin
 
     const paramStr = endOfParams !== -1 ? paramsString.substring(0, endOfParams) : paramsString;
     const parts = smartSplitArgs(paramStr);
-    const params: Array<{ name: string; isInOut: boolean; arrayStartIndex?: number }> = [];
+    const params: Array<{ name: string; isInOut: boolean; arrayStartIndex?: number; arrayStartIndices?: Array<string | number> }> = [];
 
     for (const part of parts) {
         const colonIdx = part.indexOf(':');
@@ -259,18 +259,27 @@ export function extractFunctionParams(paramsString: string): Array<{ name: strin
         const isInOut = REGEX_INOUT.test(namePart);
         const name = namePart.replace(REGEX_INOUT, '').trim();
 
-        // Détecter l'indice de départ pour les paramètres tableau
-        // Syntaxe: tableau type[x .. (...)] où x est un entier littéral
+        // Détecter les indices de départ pour les paramètres tableau
+        // Syntaxe: tableau type[lo1 .. hi1, lo2 .. hi2, ...]
         let arrayStartIndex: number | undefined;
+        let arrayStartIndices: Array<string | number> | undefined;
         if (typePart) {
-            const arrayStartMatch = /\btableau\b.*\[\s*(\d+)\s*\.\./i.exec(typePart);
-            if (arrayStartMatch) {
-                arrayStartIndex = parseInt(arrayStartMatch[1], 10);
+            const arrayMatch = /\btableau\b.*\[([^\]]+)\]/i.exec(typePart);
+            if (arrayMatch) {
+                const dims = smartSplitArgs(arrayMatch[1]);
+                arrayStartIndices = dims.map(d => {
+                    const m = d.match(/^\s*(.+?)\s*\.\./);
+                    const lo = m ? m[1].trim() : '0';
+                    return /^-?\d+$/.test(lo) ? parseInt(lo, 10) : lo;
+                });
+                if (arrayStartIndices.length > 0 && typeof arrayStartIndices[0] === 'number') {
+                    arrayStartIndex = arrayStartIndices[0];
+                }
             }
         }
 
         if (name) {
-            params.push({ name, isInOut, arrayStartIndex });
+            params.push({ name, isInOut, arrayStartIndex, arrayStartIndices });
         }
     }
 

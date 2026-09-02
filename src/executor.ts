@@ -39,11 +39,8 @@ const REGEX_RETURN_LINE = /^\s*return\b/i;
 const REGEX_IF_CONDITION = /^(\s*if\s+)(.*?)(\s+then\s*:?)\s*$/i;
 const REGEX_ELSEIF_CONDITION = /^(\s*elseif\s+)(.*?)(\s+then\s*:?)\s*$/i;
 const REGEX_WHILE_CONDITION = /^(\s*while\s+)(.*?)(\s+do\s*:?)\s*$/i;
-const REGEX_ARRAY_DECL = /^\s*([\p{L}_][\p{L}0-9_]*)\s*(?:=|\u2190)\s*tableau\s+[\p{L}_][\p{L}0-9_]*\s*\[([^\]]+)\]\s*$/iu;
+const REGEX_ARRAY_DECL = /^\s*([\p{L}_][\p{L}0-9_]*)\s*(?:=|\u2190|<-)\s*tableau\s+[\p{L}_][\p{L}0-9_]*\s*\[([^\]]+)\]\s*$/iu;
 const REGEX_INDENTATION = /^\s*/;
-const REGEX_MULTI_INDEX = /([\p{L}0-9_]+)\s*\[([^\]]+)\]/gu;
-const REGEX_MULTI_BRACKET = /([\p{L}0-9_]+)\s*((?:\[[^\]]+\])+)/gu;
-const REGEX_BRACKET_EXTRACT = /\[([^\]]+)\]/g;
 const REGEX_ARRAY_LITERAL = /(?:(?<=^)|(?<=[\s=,(;:]))\[([^\]]*)\]/gu;
 
 /**
@@ -82,6 +79,174 @@ export function transpileToLua(pscCode: string): string {
     let luaCode = '';
     const lines = cleanedCode.split('\n');
     const functionStack: any[] = [];
+    const globalArrayStartIndices = new Map<string, Array<string | number>>();
+
+    const DISALLOWED_ARRAY_TARGETS = new Set([
+        'retourner', 'retourne', 'return',
+        'dans', 'in',
+        'et', 'ou', 'non', 'mod',
+        'si', 'alors', 'sinon', 'faire',
+        'pour', 'allant', 'de', 'à', 'a', 'pas', 'décroissant', 'decroissant',
+        'tant', 'que',
+        'début', 'debut', 'fin', 'algorithme', 'lexique',
+        'tableau', 'liste', 'pile', 'file', 'table'
+    ]);
+
+    /**
+     * Transforme les accès indexés a[i], a[i, j], func(a, b)[i] en accès Lua avec décalage d'offset.
+     * Gère :
+     * - Les parenthèses imbriquées (func(a, f(b))[i])
+     * - Les accès récursifs (a[b[i]])
+     * - Les chaînes de caractères ("texte [0]", a["]"])
+     * - Les mots-clés devant un littéral (retourner [1, 2])
+     * - Les dimensions multiples avec offsets hétérogènes (M[i, j] sur M[1..10, 0..20])
+     */
+    const transformArrayAccesses = (
+        line: string,
+        getStartIndex: (name: string, dimIndex: number) => string | number
+    ): string => {
+        let result = '';
+        let i = 0;
+
+        while (i < line.length) {
+            const char = line[i];
+
+            // 1. Ignorer les chaînes de caractères (simples ou doubles quotes)
+            if (char === '"' || char === "'") {
+                const quoteChar = char;
+                result += char;
+                i++;
+                while (i < line.length) {
+                    const c = line[i];
+                    result += c;
+                    if (c === '\\') {
+                        if (i + 1 < line.length) {
+                            i++;
+                            result += line[i];
+                        }
+                    } else if (c === quoteChar) {
+                        break;
+                    }
+                    i++;
+                }
+                i++;
+                continue;
+            }
+
+            // 2. Détecter un crochet ouvrant
+            if (char === '[') {
+                let prevIdx = result.length - 1;
+                while (prevIdx >= 0 && /\s/.test(result[prevIdx])) {
+                    prevIdx--;
+                }
+
+                const prevChar = prevIdx >= 0 ? result[prevIdx] : '';
+                const isIdentChar = /[\p{L}0-9_]/u.test(prevChar);
+                const isClosingParen = prevChar === ')';
+                const isClosingBracket = prevChar === ']';
+
+                if (isIdentChar || isClosingParen || isClosingBracket) {
+                    let targetName = '';
+                    if (isIdentChar) {
+                        let startName = prevIdx;
+                        while (startName >= 0 && /[\p{L}0-9_]/u.test(result[startName])) {
+                            startName--;
+                        }
+                        targetName = result.slice(startName + 1, prevIdx + 1);
+                    }
+
+                    const isDisallowedKeyword = targetName && DISALLOWED_ARRAY_TARGETS.has(targetName.toLowerCase());
+
+                    if (!isDisallowedKeyword) {
+                        const bracketsContent: string[] = [];
+                        let currPos = i;
+
+                        while (currPos < line.length && line[currPos] === '[') {
+                            let bDepth = 0;
+                            let pDepth = 0;
+                            let inStr = false;
+                            let strChar = '';
+                            const startBracket = currPos;
+                            let endBracket = -1;
+
+                            for (let k = currPos; k < line.length; k++) {
+                                const c = line[k];
+                                if (inStr) {
+                                    if (c === '\\') {
+                                        k++;
+                                    } else if (c === strChar) {
+                                        inStr = false;
+                                    }
+                                } else {
+                                    if (c === '"' || c === "'") {
+                                        inStr = true;
+                                        strChar = c;
+                                    } else if (c === '(') {
+                                        pDepth++;
+                                    } else if (c === ')') {
+                                        pDepth = Math.max(0, pDepth - 1);
+                                    } else if (c === '[') {
+                                        bDepth++;
+                                    } else if (c === ']') {
+                                        bDepth--;
+                                        if (bDepth === 0 && pDepth === 0) {
+                                            endBracket = k;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (endBracket !== -1) {
+                                const inside = line.slice(startBracket + 1, endBracket).trim();
+                                bracketsContent.push(inside);
+                                currPos = endBracket + 1;
+                                let lookAhead = currPos;
+                                while (lookAhead < line.length && /\s/.test(line[lookAhead])) {
+                                    lookAhead++;
+                                }
+                                if (lookAhead < line.length && line[lookAhead] === '[') {
+                                    currPos = lookAhead;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if (bracketsContent.length > 0) {
+                            let transformed = '';
+                            let currentDim = 0;
+
+                            for (const rawExpr of bracketsContent) {
+                                const parts = smartSplitArgs(rawExpr);
+                                for (const expr of parts) {
+                                    const startIndex = getStartIndex(targetName, currentDim);
+                                    const resolvedExpr = transformArrayAccesses(expr, getStartIndex);
+
+                                    if (startIndex === 1 || startIndex === '1') {
+                                        transformed += `[(${resolvedExpr})]`;
+                                    } else if (startIndex === 0 || startIndex === '0' || !startIndex) {
+                                        transformed += `[(${resolvedExpr}) + 1]`;
+                                    } else {
+                                        transformed += `[(${resolvedExpr}) - (${startIndex}) + 1]`;
+                                    }
+                                    currentDim++;
+                                }
+                            }
+                            result += transformed;
+                            i = currPos;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            result += line[i];
+            i++;
+        }
+
+        return result;
+    };
 
     // Convertit des parenthèses non appel de fonction en littéraux de liste: (x, y) -> __psc_liste_from_table({x, y})
     const transformParenListLiterals = (input: string): string => {
@@ -206,6 +371,14 @@ export function transpileToLua(pscCode: string): string {
                 return { lo: '0', hi: d.trim() };
             });
 
+            const currentFunc = functionStack.length > 0 ? functionStack[functionStack.length - 1] : null;
+            if (ranges.length > 0) {
+                const targetMap = (currentFunc && currentFunc.arrayLocalStartIndices)
+                    ? currentFunc.arrayLocalStartIndices
+                    : globalArrayStartIndices;
+                targetMap.set(varName, ranges.map(r => r.lo));
+            }
+
             const indentation = originalLineForIndentation.match(REGEX_INDENTATION)?.[0] || '';
             let block = `${indentation}${varName} = {}` + '\n';
 
@@ -215,8 +388,20 @@ export function transpileToLua(pscCode: string): string {
                 let innerIndent = indentation;
                 for (let idx = 0; idx < ranges.length - 1; idx++) {
                     const it = `__i${idx + 1}`;
-                    const start = `((${ranges[idx].lo})) + 1`;
-                    const finish = `((${ranges[idx].hi})) + 1`;
+                    const lo = ranges[idx].lo;
+                    const hi = ranges[idx].hi;
+                    let start: string;
+                    let finish: string;
+                    if (lo === '1' || lo === '1') {
+                        start = `(${lo})`;
+                        finish = `(${hi})`;
+                    } else if (lo === '0') {
+                        start = '1';
+                        finish = `((${hi})) + 1`;
+                    } else {
+                        start = '1';
+                        finish = `((${hi})) - ((${lo})) + 1`;
+                    }
                     block += `${innerIndent}for ${it} = ${start}, ${finish}, 1 do` + '\n';
                     innerIndent += '\t';
                     block += `${innerIndent}${path}[${it}] = {}` + '\n';
@@ -626,64 +811,30 @@ export function transpileToLua(pscCode: string): string {
             // Nettoyer les marqueurs de table
             trimmedLine = trimmedLine.replace(/__PSC_TABLE_START__/g, '').replace(/__PSC_TABLE_END__/g, '');
 
-            // 0) Étendre les indices séparés par des virgules: a[i, j] -> a[i][j]
-            REGEX_MULTI_INDEX.lastIndex = 0;
-            trimmedLine = trimmedLine.replace(REGEX_MULTI_INDEX, (m, name, inside) => {
-                const indices = smartSplitArgs(inside);
-                if (indices.length > 1) {
-                    return name + indices.map(id => `[${id}]`).join('');
-                }
-                return m;
-            });
-
-            // 1) Convertir les accès multidimensionnels: a[i][j] -> a[(i)+1][(j)+1]
-            //    SAUF si le tableau est un paramètre de fonction avec un indice de départ personnalisé
-            REGEX_MULTI_BRACKET.lastIndex = 0;
+            // 1) Transformer les accès indexés a[i], a[i, j], func(a, b)[i] en accès Lua avec offset
             const currentFuncForArrayOffset = functionStack.length > 0 ? functionStack[functionStack.length - 1] : null;
-            trimmedLine = trimmedLine.replace(REGEX_MULTI_BRACKET, (m, name, brackets) => {
-                const parts: string[] = [];
-                REGEX_BRACKET_EXTRACT.lastIndex = 0;
-                let mm: RegExpExecArray | null;
-
-                // Déterminer l'offset pour cette variable
-                let startIndex = 0; // Par défaut, tableau PSC commence à 0
-                if (currentFuncForArrayOffset && currentFuncForArrayOffset.arrayParamStartIndices) {
-                    const paramStart = currentFuncForArrayOffset.arrayParamStartIndices.get(name);
-                    if (paramStart !== undefined) {
-                        startIndex = paramStart;
+            const getStartIndex = (name: string, dimIndex: number): string | number => {
+                if (!name) return 0;
+                if (currentFuncForArrayOffset) {
+                    if (currentFuncForArrayOffset.arrayLocalStartIndices?.has(name)) {
+                        const dims = currentFuncForArrayOffset.arrayLocalStartIndices.get(name)!;
+                        return dims[dimIndex] !== undefined ? dims[dimIndex] : dims[0] || 0;
+                    }
+                    if (currentFuncForArrayOffset.arrayParamStartIndices?.has(name)) {
+                        const dims = currentFuncForArrayOffset.arrayParamStartIndices.get(name)!;
+                        return dims[dimIndex] !== undefined ? dims[dimIndex] : dims[0] || 0;
                     }
                 }
-
-                while ((mm = REGEX_BRACKET_EXTRACT.exec(brackets)) !== null) {
-                    const expr = (mm[1] || '').trim();
-                    const indices = smartSplitArgs(expr);
-                    if (indices.length > 1) {
-                        for (const idx of indices) {
-                            const id = (idx || '').trim();
-                            if (id) {
-                                if (startIndex === 1) {
-                                    parts.push(`[(${id})]`);
-                                } else if (startIndex === 0) {
-                                    parts.push(`[(${id}) + 1]`);
-                                } else {
-                                    parts.push(`[(${id}) - ${startIndex} + 1]`);
-                                }
-                            }
-                        }
-                    } else {
-                        if (startIndex === 1) {
-                            parts.push(`[(${expr})]`);
-                        } else if (startIndex === 0) {
-                            parts.push(`[(${expr}) + 1]`);
-                        } else {
-                            parts.push(`[(${expr}) - ${startIndex} + 1]`);
-                        }
-                    }
+                if (globalArrayStartIndices.has(name)) {
+                    const dims = globalArrayStartIndices.get(name)!;
+                    return dims[dimIndex] !== undefined ? dims[dimIndex] : dims[0] || 0;
                 }
-                return name + parts.join('');
-            });
+                return 0;
+            };
 
-            // 2) Convertir uniquement les littéraux de tableaux: [1,2] -> {1,2}
+            trimmedLine = transformArrayAccesses(trimmedLine, getStartIndex);
+
+            // 2) Convertir uniquement les littéraux de tableaux restants: [1,2] -> {1,2}
             REGEX_ARRAY_LITERAL.lastIndex = 0;
             trimmedLine = trimmedLine.replace(REGEX_ARRAY_LITERAL, '{$1}');
         }

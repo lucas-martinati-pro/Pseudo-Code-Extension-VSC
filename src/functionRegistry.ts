@@ -15,8 +15,10 @@ export interface FunctionInfo {
     name: string;
     params: ParamInfo[];
     inOutParamNames: string[];
-    /** Map de nom de paramètre tableau → indice de départ (0 par défaut) */
-    arrayParamStartIndices: Map<string, number>;
+    /** Map de nom de paramètre tableau → indices de départ par dimension */
+    arrayParamStartIndices: Map<string, Array<string | number>>;
+    /** Map de nom de variable locale tableau → indices de départ par dimension */
+    arrayLocalStartIndices: Map<string, Array<string | number>>;
     /** Variables locales déclarées ou assignées dans le corps de la fonction */
     localVars: string[];
 }
@@ -46,10 +48,12 @@ export class FunctionRegistry {
                     .map(p => p.name);
 
                 // Collecter les indices de départ des paramètres tableau
-                const arrayParamStartIndices = new Map<string, number>();
+                const arrayParamStartIndices = new Map<string, Array<string | number>>();
                 for (const p of params) {
-                    if (p.arrayStartIndex !== undefined) {
-                        arrayParamStartIndices.set(p.name, p.arrayStartIndex);
+                    if (p.arrayStartIndices !== undefined && p.arrayStartIndices.length > 0) {
+                        arrayParamStartIndices.set(p.name, p.arrayStartIndices);
+                    } else if (p.arrayStartIndex !== undefined) {
+                        arrayParamStartIndices.set(p.name, [p.arrayStartIndex]);
                     }
                 }
 
@@ -81,6 +85,7 @@ export class FunctionRegistry {
                     params,
                     inOutParamNames,
                     arrayParamStartIndices,
+                    arrayLocalStartIndices: new Map<string, Array<string | number>>(),
                     localVars
                 });
             }
