@@ -13,6 +13,16 @@
 
 import * as vscode from 'vscode';
 import { PSC_DEFINITIONS } from './definitions';
+import {
+    BlockDefinition,
+    findOpeningBlock,
+    findClosingBlock,
+    isBlockHeaderOrOpenLine,
+    findLastBlockIndex,
+    getAllBlockSnippets,
+    REGEX_KEYWORD_COLON_CONTEXT,
+    REGEX_END_OF_BLOCK_HEADER
+} from './blocks';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REGEX PRÉ-COMPILÉES
@@ -25,28 +35,13 @@ const REGEX_VAR_DECL = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)
 const REGEX_AFTER_DOT = /(?:[\])]|[\p{L}_][\p{L}0-9_]*)\.$/u;
 // Capture le nom de la variable avant le '.', même à travers des accès [i] ou des appels ()
 const REGEX_DOT_VAR_NAME = /((?:[\p{L}_][\p{L}0-9_]*)(?:\[[^\]]*\])*(?:\([^)]*\))*)\.$/u;
-const REGEX_OPEN_SI = /^\s*Si\b/i;
-const REGEX_OPEN_POUR = /^\s*Pour\b/i;
-const REGEX_OPEN_TANT_QUE = /^\s*Tant\s+que\b/i;
-const REGEX_OPEN_DEBUT = /^\s*Début\b/i;
-const REGEX_CLOSE_FSI = /^\s*fsi\b/i;
-const REGEX_CLOSE_FPOUR = /^\s*fpour\b/i;
-const REGEX_CLOSE_FTQ = /^\s*(ftq|ftant)\b/i;
-const REGEX_CLOSE_FIN = /^\s*Fin\b/i;
-const REGEX_SINON_SI = /^\s*Sinon\s+si\b/i;
 const REGEX_COMPOSITE_TYPE = /^([\p{L}_][\p{L}0-9_]*)\s*(?:=\s*)?<\s*(.+?)\s*>$/iu;
 const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
 const REGEX_LINE_COMMENT = /\/\/.*/;
 const REGEX_INOUT_PREFIX = /\bInOut\b\s*/i;
 
-// Contexte de ':' — ces mots-clés sont suivis de ':' mais ne doivent déclencher AUCUNE complétion
-const KEYWORD_COLON_CONTEXT = /(?:Alors|Faire|Sinon|d[ée]but|Lexique)\s*:\s*$/i;
-
 // Contexte de ':' pour les déclarations de types (paramètre, variable, type de retour, champ de structure)
 const TYPE_DECLARATION_COLON = /(?:(?:^|[,<(])\s*(?:InOut\s+)?[\p{L}_][\p{L}0-9_]*(?:\s+InOut)?|\))\s*:\s*$/iu;
-
-// Fin de ligne d'ouverture de bloc (avec ou sans ':') — aucune suggestion intempestive à ce moment
-const REGEX_END_OF_BLOCK_HEADER = /^(?:.*?\b(?:Alors|Faire)\s*:?|d[ée]but\s*:?|Sinon\s*:?)\s*$/i;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MÉTHODES PAR TYPE — fonctions disponibles pour chaque type de données
@@ -282,7 +277,7 @@ interface DocumentAnalysis {
     variables: Map<string, string>;
     userFunctions: Map<string, { params: string; returnType: string; fullSignature: string }>;
     compositeTypes: Map<string, Array<{ name: string; type: string }>>;
-    openBlocks: Array<{ type: 'Si' | 'Pour' | 'TantQue' | 'Début'; line: number }>;
+    openBlocks: Array<{ block: BlockDefinition; line: number }>;
     currentFunctionName: string | null;
     currentFunctionParams: Array<{ name: string; type: string }>;
     /** nom de variable → type de base résolu (sans 'tableau', sans '[...]') */
@@ -359,7 +354,7 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
     const variables = new Map<string, string>();
     const userFunctions = new Map<string, { params: string; returnType: string; fullSignature: string }>();
     const compositeTypes = new Map<string, Array<{ name: string; type: string }>>();
-    const openBlocks: Array<{ type: 'Si' | 'Pour' | 'TantQue' | 'Début'; line: number }> = [];
+    const openBlocks: Array<{ block: BlockDefinition; line: number }> = [];
     const variableTypes = new Map<string, string>();
     let currentFunctionName: string | null = null;
     let currentFunctionParams: Array<{ name: string; type: string }> = [];
@@ -440,7 +435,7 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
 
         // Variables dans le Lexique (aussi à l'intérieur de /** ... */)
         if (inLexiqueBlock) {
-            if (REGEX_OPEN_DEBUT.test(trimmed) || /^\s*(Algorithme|Fonction)\b/i.test(trimmed) || /^\s*\*\/\s*$/.test(trimmed)) {
+            if (/^\s*d[ée]but\b/i.test(trimmed) || /^\s*(Algorithme|Fonction)\b/i.test(trimmed) || /^\s*\*\/\s*$/.test(trimmed)) {
                 inLexiqueBlock = false;
             } else {
                 const varDecl = REGEX_VAR_DECL.exec(trimmed);
@@ -508,29 +503,13 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
 
         // Suivi des blocs ouverts
         if (i <= cursorLine) {
-            if (REGEX_SINON_SI.test(trimmed)) {
-                // pas un nouveau bloc
-            } else if (REGEX_OPEN_SI.test(trimmed) && !REGEX_SINON_SI.test(trimmed)) {
-                openBlocks.push({ type: 'Si', line: i });
+            const openB = findOpeningBlock(trimmed);
+            if (openB) {
+                openBlocks.push({ block: openB, line: i });
             }
-            if (REGEX_OPEN_POUR.test(trimmed)) openBlocks.push({ type: 'Pour', line: i });
-            if (REGEX_OPEN_TANT_QUE.test(trimmed)) openBlocks.push({ type: 'TantQue', line: i });
-            if (REGEX_OPEN_DEBUT.test(trimmed)) openBlocks.push({ type: 'Début', line: i });
-
-            if (REGEX_CLOSE_FSI.test(trimmed)) {
-                const idx = findLastBlockIndex(openBlocks, 'Si');
-                if (idx >= 0) openBlocks.splice(idx, 1);
-            }
-            if (REGEX_CLOSE_FPOUR.test(trimmed)) {
-                const idx = findLastBlockIndex(openBlocks, 'Pour');
-                if (idx >= 0) openBlocks.splice(idx, 1);
-            }
-            if (REGEX_CLOSE_FTQ.test(trimmed)) {
-                const idx = findLastBlockIndex(openBlocks, 'TantQue');
-                if (idx >= 0) openBlocks.splice(idx, 1);
-            }
-            if (REGEX_CLOSE_FIN.test(trimmed)) {
-                const idx = findLastBlockIndex(openBlocks, 'Début');
+            const closeB = findClosingBlock(trimmed);
+            if (closeB) {
+                const idx = findLastBlockIndex(openBlocks.map(b => ({ type: b.block.id })), closeB.block.id);
                 if (idx >= 0) openBlocks.splice(idx, 1);
             }
         }
@@ -540,13 +519,6 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
         variables, userFunctions, compositeTypes, openBlocks,
         currentFunctionName, currentFunctionParams, variableTypes
     };
-}
-
-function findLastBlockIndex(blocks: Array<{ type: string }>, type: string): number {
-    for (let i = blocks.length - 1; i >= 0; i--) {
-        if (blocks[i].type === type) return i;
-    }
-    return -1;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -590,7 +562,7 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
         // ─── Contexte : après ':' ───
         if (/:\s*$/.test(textBeforeCursor)) {
             // Après un mot-clé de bloc ("Alors :", "Faire :", "Sinon :", etc.) → AUCUNE complétion
-            if (KEYWORD_COLON_CONTEXT.test(textBeforeCursor)) {
+            if (REGEX_KEYWORD_COLON_CONTEXT.test(textBeforeCursor)) {
                 return [];
             }
             // Après une déclaration (variable, paramètre, retour de fonction, champ) → types
@@ -818,25 +790,21 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
         const items: vscode.CompletionItem[] = [];
 
         const structures: Array<{ label: string; filterText?: string; snippet: string; detail: string; sort: string }> = [
-            { label: 'Si', filterText: 'si', snippet: 'Si ${1:condition} Alors :\n\t${2}\nfsi', detail: 'Structure conditionnelle Si/Alors', sort: '2a' },
-            { label: 'Si...Sinon', filterText: 'sisinon si sinon', snippet: 'Si ${1:condition} Alors :\n\t${2}\nSinon :\n\t${3}\nfsi', detail: 'Structure Si/Alors/Sinon', sort: '2b' },
-            { label: 'Pour', filterText: 'pour', snippet: 'Pour ${1:i} de ${2:0} à ${3:n-1} Faire :\n\t${4}\nfpour', detail: 'Boucle Pour', sort: '2c' },
-            { label: 'Pour (décroissant)', filterText: 'pourdec pour décroissant', snippet: 'Pour ${1:i} de ${2:n-1} à ${3:0} décroissant Faire :\n\t${4}\nfpour', detail: 'Boucle Pour décroissante', sort: '2d' },
-            { label: 'Pour (tableau)', filterText: 'pourtab pour tab', snippet: 'Pour ${1:i} de ${2:0} à ${3:n-1} Faire :\n\t${4:tab}[${1:i}] ← ${5}\nfpour', detail: 'Boucle Pour pour parcourir un tableau', sort: '2c2' },
-            { label: 'Tant que', filterText: 'tantque tant que tq', snippet: 'Tant que ${1:condition} Faire :\n\t${2}\nftq', detail: 'Boucle Tant que', sort: '2e' },
+            ...getAllBlockSnippets().map(s => ({
+                label: s.label,
+                filterText: s.filterText,
+                snippet: s.body,
+                detail: s.detail,
+                sort: s.sort
+            })),
             { label: 'retourner', filterText: 'retourner', snippet: 'retourner ${1:valeur}', detail: 'Retourne une valeur', sort: '2f' },
             { label: 'retourne', filterText: 'retourne', snippet: 'retourne ${1:valeur}', detail: 'Retourne une valeur (variante)', sort: '2f2' },
             { label: 'écrire', filterText: 'écrire ecrire', snippet: 'écrire(${1:valeur})', detail: 'Affiche une valeur', sort: '2g' },
             { label: 'lire', filterText: 'lire', snippet: 'lire()', detail: 'Lit une valeur depuis l\'entrée', sort: '2g2' },
-            { label: 'Sinon', filterText: 'sinon', snippet: 'Sinon :\n\t${1}', detail: 'Branche alternative', sort: '2h' },
-            { label: 'Sinon si', filterText: 'sinonsi sinon si', snippet: 'Sinon si ${1:condition} Alors :\n\t${2}', detail: 'Branche conditionnelle alternative', sort: '2i' },
             { label: 'Lexique', filterText: 'lexique', snippet: '/*\nLexique :\n${1:variable} : ${2:type}\n*/', detail: 'Bloc Lexique pour déclarer les variables', sort: '2m' },
             { label: 'saisie', filterText: 'saisie', snippet: 'écrire("${1:Entrez une valeur : }")\n${2:variable} ← lire()', detail: 'Saisie utilisateur avec message', sort: '2n' },
-            { label: 'Fonction', filterText: 'fonction func', snippet: 'Fonction ${1:nom}(${2:params}) : ${3:type}\nDébut\n\t${4}\nFin', detail: 'Déclare une fonction', sort: '2j' },
             { label: 'Fonction récursive', filterText: 'foncrec fonction recursive', snippet: 'Fonction ${1:nomFonction}(${2:n} : ${3:entier}) : ${4:entier}\nDébut\n\tSi (${2:n} = ${5:0}) Alors :\n\t\tretourner ${6:1}\n\tSinon :\n\t\tretourner ${7:${2:n} * ${1:nomFonction}(${2:n}-1)}\n\tfsi\nFin', detail: 'Structure de fonction récursive avec cas de base', sort: '2j2' },
-            { label: 'Fichier', filterText: 'fichier', snippet: '${1:handle} ← fichierOuvrir(${2:"fichier.txt"})\nTant que non fichierFin(${1:handle}) Faire :\n\t${3:ligne} ← fichierLire(${1:handle})\n\t${4}\nftq\nfichierFermer(${1:handle})', detail: 'Lecture complète de fichier', sort: '2o' },
-            { label: 'Algorithme', filterText: 'algorithme algo', snippet: 'Algorithme ${1:Nom}\nDébut\n\t${2}\nFin', detail: 'Algorithme principal (nommé)', sort: '2k' },
-            { label: 'Algorithme (sans nom)', filterText: 'algorithme algo', snippet: 'Algorithme\nDébut\n\t${1}\nFin', detail: 'Algorithme principal (anonyme)', sort: '2l' }
+            { label: 'Fichier', filterText: 'fichier', snippet: '${1:handle} ← fichierOuvrir(${2:"fichier.txt"})\nTant que non fichierFin(${1:handle}) Faire :\n\t${3:ligne} ← fichierLire(${1:handle})\n\t${4}\nftq\nfichierFermer(${1:handle})', detail: 'Lecture complète de fichier', sort: '2o' }
         ];
 
         for (const s of structures) {
@@ -851,22 +819,11 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
         }
 
         // Fermetures de blocs (uniquement si on n'est pas déjà sur une ligne d'ouverture de bloc)
-        const isOpeningLine = /^\s*(?:Si\b|Pour\b|Tant\s+que\b|Algorithme\b|Fonction\b|Procédure\b|d[ée]but\b)/i.test(_trimmedBefore) ||
-                              /\b(?:Alors|Faire)\b/i.test(_trimmedBefore);
-
-        if (!isOpeningLine) {
+        if (!isBlockHeaderOrOpenLine(_trimmedBefore)) {
             for (let i = analysis.openBlocks.length - 1; i >= 0; i--) {
-                const block = analysis.openBlocks[i];
-                let closingKeyword: string;
-                let closingDetail: string;
-
-                switch (block.type) {
-                    case 'Si': closingKeyword = 'fsi'; closingDetail = `Ferme le Si de la ligne ${block.line + 1}`; break;
-                    case 'Pour': closingKeyword = 'fpour'; closingDetail = `Ferme le Pour de la ligne ${block.line + 1}`; break;
-                    case 'TantQue': closingKeyword = 'ftq'; closingDetail = `Ferme le Tant que de la ligne ${block.line + 1}`; break;
-                    case 'Début': closingKeyword = 'Fin'; closingDetail = `Ferme le Début de la ligne ${block.line + 1}`; break;
-                    default: continue;
-                }
+                const openBlock = analysis.openBlocks[i];
+                const closingKeyword = openBlock.block.closeKeywords[0];
+                const closingDetail = `Ferme le ${openBlock.block.name} de la ligne ${openBlock.line + 1}`;
 
                 const item = new vscode.CompletionItem(closingKeyword, vscode.CompletionItemKind.Keyword);
                 item.detail = closingDetail;

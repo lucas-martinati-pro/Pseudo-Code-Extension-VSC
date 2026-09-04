@@ -1,14 +1,10 @@
 import * as vscode from 'vscode';
-import { PATTERNS } from './constants';
+import { INCREASE_INDENT_PATTERN, DECREASE_INDENT_PATTERN } from './blocks';
 
 export function formatDocument(document: vscode.TextDocument): vscode.TextEdit[] {
     const edits: vscode.TextEdit[] = [];
     let indentationLevel = 0;
     const tabChar = '\t';
-
-    // Patterns pour l'indentation
-    const openingPattern = /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i;
-    const closingPattern = PATTERNS.CLOSING_KEYWORDS;
 
     // Pattern pour détecter les commentaires de bloc multi-lignes
     let inBlockComment = false;
@@ -63,9 +59,7 @@ export function formatDocument(document: vscode.TextDocument): vscode.TextEdit[]
 
         // RÈGLE 1 : Si la ligne est un mot-clé de fermeture (Fin, fsi...) ou 'Sinon' / 'Sinon si',
         // on doit DIMINUER le niveau d'indentation AVANT de l'écrire.
-        const isSinon = /^Sinon\s*:?\s*(?:\/\/.*)?$/i.test(trimmedText);
-        const isSinonSi = /^Sinon\s+si\b.*?\balors\s*:?\s*(?:\/\/.*)?$/i.test(trimmedText);
-        if ((closingPattern.test(trimmedText) || isSinon || isSinonSi) && indentationLevel > 0) {
+        if (DECREASE_INDENT_PATTERN.test(trimmedText) && indentationLevel > 0) {
             indentationLevel--;
         }
 
@@ -75,10 +69,9 @@ export function formatDocument(document: vscode.TextDocument): vscode.TextEdit[]
             edits.push(vscode.TextEdit.replace(line.range, newText));
         }
 
-        // RÈGLE 2 : Si la ligne est un mot-clé d'ouverture (Début, Faire:, Alors:),
+        // RÈGLE 2 : Si la ligne est un mot-clé d'ouverture (Début, Faire:, Alors:) ou une continuation (Sinon),
         // on doit AUGMENTER le niveau d'indentation pour les lignes SUIVANTES.
-        // 'Sinon' et 'Sinon si' créent également un bloc pour les lignes suivantes.
-        if (openingPattern.test(trimmedText) || isSinon || isSinonSi) {
+        if (INCREASE_INDENT_PATTERN.test(trimmedText)) {
             indentationLevel++;
         }
     }

@@ -15,16 +15,7 @@ const REGEX_IDENT_CHAR_FULL = /[\p{L}0-9_]/u;
 const REGEX_IDENTIFIER_EXTRACT = /^[\p{L}_][\p{L}0-9_]*/u;
 const REGEX_WHITESPACE = /\s/;
 
-// Patterns pour la détection des blocs
-const REGEX_OPEN_SI = /^\s*Si\b/i;
-const REGEX_OPEN_SINON_SI = /^\s*Sinon\s+si\b/i;
-const REGEX_OPEN_POUR = /^\s*Pour\b/i;
-const REGEX_OPEN_TANT_QUE = /^\s*Tant\s+que\b/i;
-const REGEX_OPEN_DEBUT = /^\s*Début\b/i;
-const REGEX_CLOSE_FSI = /^\s*fsi\b/i;
-const REGEX_CLOSE_FPOUR = /^\s*fpour\b/i;
-const REGEX_CLOSE_FTQ = /^\s*(ftq|ftant)\b/i;
-const REGEX_CLOSE_FIN = /^\s*Fin\b/i;
+import { BlockDefinition, findOpeningBlock, findClosingBlock } from './blocks';
 
 const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
 const REGEX_VAR_DECL_IN_LEXIQUE = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)*)\s*:\s*.+/iu;
@@ -32,20 +23,12 @@ const REGEX_VAR_DECL_IN_LEXIQUE = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\
 // Cache pour les identifiants connus en minuscules (optimisation lookup)
 const KNOWN_IDENTIFIERS_LOWER = new Set([...KNOWN_IDENTIFIERS].map(id => id.toLowerCase()));
 
-// Types de blocs ouvrants et leurs fermetures attendues
-type BlockType = 'Si' | 'Pour' | 'TantQue' | 'Début';
+// Informations sur les blocs ouverts
 interface BlockInfo {
-    type: BlockType;
+    block: BlockDefinition;
     lineNumber: number;
     lineText: string;
 }
-
-const EXPECTED_CLOSING: Record<BlockType, string> = {
-    'Si': 'fsi',
-    'Pour': 'fpour',
-    'TantQue': 'ftq/ftant',
-    'Début': 'Fin'
-};
 
 /**
  * Cœur du Linter avec gestion de la portée lexicale, déclaration implicite et vérification des blocs.
@@ -95,7 +78,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
 
         // Sortie du bloc Lexique (un mot-clé structurel met fin au Lexique)
         if (inLexiqueBlock) {
-            if (REGEX_OPEN_DEBUT.test(trimmed) || /^\s*(Algorithme|Fonction)\b/i.test(trimmed) || /^\s*Fin\b/i.test(trimmed)) {
+            if (/^\s*d[ée]but\b/i.test(trimmed) || /^\s*(Algorithme|Fonction)\b/i.test(trimmed) || /^\s*Fin\b/i.test(trimmed)) {
                 inLexiqueBlock = false;
             } else {
                 // Parser les déclarations de variables dans le Lexique
@@ -134,44 +117,27 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(trimmedText);
         const pourMatch = REGEX_POUR_LOOP.exec(trimmedText);
 
-        // Suivi des blocs pour vérification de fermeture
-        if (REGEX_OPEN_SINON_SI.test(trimmedText)) {
-            // Sinon si : ne crée pas un nouveau bloc Si, c'est une continuation
-            // On ne touche pas au blockStack
-        } else if (REGEX_OPEN_SI.test(trimmedText) && !REGEX_OPEN_SINON_SI.test(trimmedText)) {
-            blockStack.push({ type: 'Si', lineNumber: lineIndex, lineText: trimmedText });
-        }
-        if (REGEX_OPEN_POUR.test(trimmedText)) {
-            blockStack.push({ type: 'Pour', lineNumber: lineIndex, lineText: trimmedText });
-        }
-        if (REGEX_OPEN_TANT_QUE.test(trimmedText)) {
-            blockStack.push({ type: 'TantQue', lineNumber: lineIndex, lineText: trimmedText });
-        }
-        if (REGEX_OPEN_DEBUT.test(trimmedText)) {
-            blockStack.push({ type: 'Début', lineNumber: lineIndex, lineText: trimmedText });
+        // Suivi des blocs ouvrants
+        const openingBlock = findOpeningBlock(trimmedText);
+        if (openingBlock) {
+            blockStack.push({ block: openingBlock, lineNumber: lineIndex, lineText: trimmedText });
         }
 
-        // ─── Détection des blocs fermants avec recherche intelligente ───
-        // Stratégie "search-and-recover" :
-        // 1. Si le sommet de la pile correspond → pop normal
-        // 2. Sinon, chercher l'ouvrant correspondant plus bas dans la pile
-        // 3. Si trouvé : signaler les blocs intermédiaires comme non fermés (sur leur ligne d'ouverture)
-        // 4. Si non trouvé : signaler le fermant comme orphelin
-
-        const closeBlock = (closingKeyword: string, expectedType: BlockType, closingLineIndex: number, closingText: string) => {
+        // ─── Détection des blocs fermants avec recherche intelligente (search-and-recover) ───
+        const closeBlock = (closingKeyword: string, expectedBlock: BlockDefinition, closingLineIndex: number, closingText: string) => {
             if (blockStack.length === 0) {
                 // Aucun bloc ouvert → fermant orphelin
                 const range = new vscode.Range(closingLineIndex, 0, closingLineIndex, closingText.length);
                 diagnostics.push(new vscode.Diagnostic(
                     range,
-                    `'${closingKeyword}' inattendu : aucun bloc '${expectedType}' ouvert.`,
+                    `'${closingKeyword}' inattendu : aucun bloc '${expectedBlock.name}' ouvert.`,
                     vscode.DiagnosticSeverity.Error
                 ));
                 return;
             }
 
             const lastBlock = blockStack[blockStack.length - 1];
-            if (lastBlock.type === expectedType) {
+            if (lastBlock.block.id === expectedBlock.id) {
                 // Cas normal : le sommet correspond → pop
                 blockStack.pop();
                 return;
@@ -180,7 +146,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
             // Le sommet ne correspond pas → chercher l'ouvrant correspondant plus bas dans la pile
             let matchIndex = -1;
             for (let k = blockStack.length - 1; k >= 0; k--) {
-                if (blockStack[k].type === expectedType) {
+                if (blockStack[k].block.id === expectedBlock.id) {
                     matchIndex = k;
                     break;
                 }
@@ -194,7 +160,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
                     const range = new vscode.Range(unclosed.lineNumber, 0, unclosed.lineNumber, unclosedLine.text.length);
                     diagnostics.push(new vscode.Diagnostic(
                         range,
-                        `Bloc '${unclosed.type}' non fermé. Il manque un '${EXPECTED_CLOSING[unclosed.type]}'.`,
+                        `Bloc '${unclosed.block.name}' non fermé. Il manque un '${unclosed.block.expectedClosing}'.`,
                         vscode.DiagnosticSeverity.Error
                     ));
                 }
@@ -205,20 +171,15 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
                 const range = new vscode.Range(closingLineIndex, 0, closingLineIndex, closingText.length);
                 diagnostics.push(new vscode.Diagnostic(
                     range,
-                    `'${closingKeyword}' inattendu : aucun bloc '${expectedType}' ouvert.`,
+                    `'${closingKeyword}' inattendu : aucun bloc '${expectedBlock.name}' ouvert.`,
                     vscode.DiagnosticSeverity.Error
                 ));
             }
         };
 
-        if (REGEX_CLOSE_FSI.test(trimmedText)) {
-            closeBlock('fsi', 'Si', lineIndex, trimmedText);
-        } else if (REGEX_CLOSE_FPOUR.test(trimmedText)) {
-            closeBlock('fpour', 'Pour', lineIndex, trimmedText);
-        } else if (REGEX_CLOSE_FTQ.test(trimmedText)) {
-            closeBlock('ftq', 'TantQue', lineIndex, trimmedText);
-        } else if (REGEX_CLOSE_FIN.test(trimmedText)) {
-            closeBlock('Fin', 'Début', lineIndex, trimmedText);
+        const closingMatch = findClosingBlock(trimmedText);
+        if (closingMatch) {
+            closeBlock(closingMatch.keyword, closingMatch.block, lineIndex, trimmedText);
         }
 
         // ─── Gestion des portées (scope) ───
@@ -266,7 +227,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         
         // Détecter les affectations (←, <-, =)
         let assignMatch = trimmedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*(?:←|<-)\s*(.+)$/u);
-        if (!assignMatch && !REGEX_OPEN_SI.test(trimmedText) && !REGEX_OPEN_TANT_QUE.test(trimmedText) && !REGEX_OPEN_POUR.test(trimmedText) && !PATTERNS.FUNCTION_DECLARATION.test(trimmedText)) {
+        if (!assignMatch && !openingBlock && !PATTERNS.FUNCTION_DECLARATION.test(trimmedText)) {
             assignMatch = trimmedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*=\s*([^=].*)$/u);
         }
 
@@ -305,7 +266,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const range = new vscode.Range(unclosed.lineNumber, 0, unclosed.lineNumber, line.text.length);
         diagnostics.push(new vscode.Diagnostic(
             range,
-            `Bloc '${unclosed.type}' non fermé. Il manque un '${EXPECTED_CLOSING[unclosed.type]}'.`,
+            `Bloc '${unclosed.block.name}' non fermé. Il manque un '${unclosed.block.expectedClosing}'.`,
             vscode.DiagnosticSeverity.Error
         ));
     }

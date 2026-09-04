@@ -4,6 +4,8 @@
  */
 
 import { PSC_DEFINITIONS } from './definitions';
+import { REGEX_ALL_CLOSING } from './blocks';
+export * from './blocks';
 
 // Mots-clés du langage
 export const KEYWORDS = {
@@ -79,7 +81,7 @@ export const PATTERNS = {
     ALGORITHM: /^\s*algorithme\b/i,
     BEGIN: /^\s*Début\b/i,
     END: /^\s*Fin\b/i,
-    CLOSING_KEYWORDS: /^\s*(Fin|fsi|fpour|ftq|ftant)\b/i,
+    CLOSING_KEYWORDS: REGEX_ALL_CLOSING,
     OPENING_BLOCK: /^\s*(Si|Tant que|Début)(?![\p{L}0-9_])/iu,
 
     // Commentaires

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { formatDocument } from './formatter';
+import { INCREASE_INDENT_PATTERN, DECREASE_INDENT_PATTERN, ALL_CLOSING_KEYWORDS } from './blocks';
 import { executeCode, cleanOldTempFiles } from './services/runner';
 import { linter } from './services/linter';
 import { handleSymbolReplacement as handleSymbolReplacementImpl } from './autoEdits/symbols';
@@ -70,28 +71,29 @@ export function activate(context: vscode.ExtensionContext) {
     cleanOldTempFiles();
 
     // --- Configuration du langage (indentation automatique et règles onEnter) ---
+    const closingLinePattern = new RegExp(`^\\s*(${ALL_CLOSING_KEYWORDS.join('|')})\\b.*$`, 'i');
     context.subscriptions.push(vscode.languages.setLanguageConfiguration('psc', {
         indentationRules: {
-            increaseIndentPattern: /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i,
-            decreaseIndentPattern: /^\s*(fin\b|fsi\b|fpour\b|ftq\b|ftant\b|sinon\b)/i
+            increaseIndentPattern: INCREASE_INDENT_PATTERN,
+            decreaseIndentPattern: DECREASE_INDENT_PATTERN
         },
         onEnterRules: [
             {
-                beforeText: /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?)\s*(?:\/\/.*)?$/i,
-                afterText: /^\s*(fin|fsi|fpour|ftq|ftant|sinon)\b/i,
+                beforeText: INCREASE_INDENT_PATTERN,
+                afterText: DECREASE_INDENT_PATTERN,
                 action: { indentAction: vscode.IndentAction.IndentOutdent }
             },
             {
-                beforeText: /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i,
+                beforeText: INCREASE_INDENT_PATTERN,
                 action: { indentAction: vscode.IndentAction.Indent }
             },
             {
-                beforeText: /^\s*(fin|fsi|fpour|ftq|ftant)\b.*$/i,
+                beforeText: closingLinePattern,
                 action: { indentAction: vscode.IndentAction.None }
             },
             {
                 beforeText: /^\s*$/,
-                previousLineText: /^\s*(fin|fsi|fpour|ftq|ftant)\b.*$/i,
+                previousLineText: closingLinePattern,
                 action: { indentAction: vscode.IndentAction.None }
             }
         ]
