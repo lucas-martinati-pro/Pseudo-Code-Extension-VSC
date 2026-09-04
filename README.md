@@ -158,3 +158,9 @@ code --install-extension pseudocode-interpreter-0.3.0.vsix
 ## Contributions
 
 Les contributions, les rapports de bugs et les suggestions de fonctionnalités sont les bienvenus ! N'hésitez pas à ouvrir une "Issue" ou une "Pull Request" sur le dépôt GitHub du projet.
+
+---
+
+## 🤖 Développement & Intelligence Artificielle
+
+Ce projet est développé et maintenu avec l'assistance d'outils d'intelligence artificielle (utilisés notamment pour l'aide à la conception, l'optimisation du code et la documentation), sous supervision et contrôle humain rigoureux.
