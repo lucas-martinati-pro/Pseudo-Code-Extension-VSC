@@ -95,17 +95,40 @@
       {
         "command": "psc.execute",
         "key": "ctrl+f5",
-        "when": "resourceLangId == psc"
+        "when": "resourceLangId == psc && config.psc.execution.enabled"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "psc.execute",
-          "when": "resourceLangId == psc",
+          "when": "resourceLangId == psc && config.psc.execution.enabled",
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "Pseudo-Code (PSC)",
+      "properties": {
+        "psc.execution.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Activer/désactiver la transpilation et l'exécution du pseudo-code (bouton ▶️ et Ctrl+F5). La coloration syntaxique reste active.",
+          "order": 1
+        },
+        "psc.linter.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Activer/désactiver l'analyse diagnostique en temps réel (vérification des blocs, variables non déclarées, arité des fonctions).",
+          "order": 2
+        },
+        "psc.intellisense.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Activer/désactiver l'autocomplétion, l'aide à la signature, le survol informatif et la navigation vers les définitions.",
+          "order": 3
+        }
+      }
     },
     "configurationDefaults": {
       "[psc]": {
