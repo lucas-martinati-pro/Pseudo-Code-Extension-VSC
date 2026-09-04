@@ -13,6 +13,8 @@
 
 import * as vscode from 'vscode';
 import { PSC_DEFINITIONS } from './definitions';
+import { TYPE_MAPPING } from './constants';
+import { extractFunctionParams, parseCompositeFields, extractPourLoopVar } from './utils';
 import {
     BlockDefinition,
     findOpeningBlock,
@@ -30,7 +32,6 @@ import {
 
 const REGEX_FUNC_DECL = /^\s*Fonction\s+([\p{L}_][\p{L}0-9_]*)\s*\(([^)]*)\)/iu;
 const REGEX_ASSIGNMENT = /^\s*([\p{L}_][\p{L}0-9_]*)\s*(?:←|<-)/u;
-const REGEX_POUR_VAR = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)\s+(?:allant\s+)?de\b/iu;
 const REGEX_VAR_DECL = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)*)\s*:\s*/u;
 const REGEX_AFTER_DOT = /(?:[\])]|[\p{L}_][\p{L}0-9_]*)\.$/u;
 // Capture le nom de la variable avant le '.', même à travers des accès [i] ou des appels ()
@@ -38,7 +39,6 @@ const REGEX_DOT_VAR_NAME = /((?:[\p{L}_][\p{L}0-9_]*)(?:\[[^\]]*\])*(?:\([^)]*\)
 const REGEX_COMPOSITE_TYPE = /^([\p{L}_][\p{L}0-9_]*)\s*(?:=\s*)?<\s*(.+?)\s*>$/iu;
 const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
 const REGEX_LINE_COMMENT = /\/\/.*/;
-const REGEX_INOUT_PREFIX = /\bInOut\b\s*/i;
 
 // Contexte de ':' pour les déclarations de types (paramètre, variable, type de retour, champ de structure)
 const TYPE_DECLARATION_COLON = /(?:(?:^|[,<(])\s*(?:InOut\s+)?[\p{L}_][\p{L}0-9_]*(?:\s+InOut)?|\))\s*:\s*$/iu;
@@ -132,36 +132,6 @@ const TYPE_METHODS: Record<string, TypeMethod[]> = {
     ]
 };
 
-// Alias de types pour résoudre les types avec/sans accents
-const TYPE_ALIASES: Record<string, string> = {
-    'chaine': 'chaîne',
-    'caractere': 'caractère',
-    'booleen': 'booléen',
-    'reel': 'réel'
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// CATÉGORIES DE FONCTIONS INTÉGRÉES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const FUNCTION_CATEGORIES: Array<{ label: string; functions: string[] }> = [
-    { label: 'Chaînes', functions: ['longueur', 'concat', 'souschaîne', 'ième', 'chaineversentier'] },
-    { label: 'Fichiers', functions: ['fichierouvrir', 'fichierfermer', 'fichierlire', 'fichierfin', 'fichiercreer', 'fichierecrire'] },
-    { label: 'Liste', functions: ['tete', 'val', 'suc', 'finliste', 'listevide', 'ajoutteteliste', 'suppressionteteliste', 'ajoutqueueliste', 'suppressionqueueliste', 'ajoutliste', 'suppressionliste', 'changeliste'] },
-    { label: 'Liste Symétrique', functions: ['tetels', 'queuels', 'valls', 'sucls', 'precls', 'finls', 'videls', 'ajouttetels', 'suppressiontetels', 'ajoutqueuels', 'suppressionqueuels', 'ajoutls', 'suppressionls', 'changels'] },
-    { label: 'Pile', functions: ['pilevide', 'sommet', 'estvidepile', 'empiler', 'depiler'] },
-    { label: 'File', functions: ['filevide', 'estvidefile', 'enfiler', 'defiler', 'premier', 'ajoutfile', 'suppressionfile', 'estfilevide'] },
-    { label: 'Table', functions: ['tablevide', 'domaine', 'accestable', 'ajouttable', 'suppressiontable', 'changetable', 'estdans'] },
-    { label: 'Autre', functions: ['comparaison'] }
-];
-
-const FUNCTION_TO_CATEGORY = new Map<string, string>();
-for (const cat of FUNCTION_CATEGORIES) {
-    for (const fn of cat.functions) {
-        FUNCTION_TO_CATEGORY.set(fn.toLowerCase(), cat.label);
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // SIGNATURES DES FONCTIONS INTÉGRÉES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -175,78 +145,13 @@ interface BuiltinFunctionInfo {
 }
 
 function buildBuiltinFunctions(): BuiltinFunctionInfo[] {
-    const signatureMap: Record<string, { sig: string; snippet: string }> = {
-        'longueur': { sig: 'longueur(s : chaîne) : entier', snippet: 'longueur(${1:s})' },
-        'concat': { sig: 'concat(s1 : chaîne, s2 : chaîne) : chaîne', snippet: 'concat(${1:s1}, ${2:s2})' },
-        'souschaîne': { sig: 'souschaîne(s : chaîne, début : entier, fin : entier) : chaîne', snippet: 'souschaîne(${1:s}, ${2:début}, ${3:fin})' },
-        'ième': { sig: 'ième(s : chaîne, i : entier) : caractère', snippet: 'ième(${1:s}, ${2:i})' },
-        'chaineversentier': { sig: 'chaîneVersEntier(s : chaîne) : entier', snippet: 'chaîneVersEntier(${1:s})' },
-        'fichierouvrir': { sig: 'fichierOuvrir(nom : chaîne [, mode]) : entier', snippet: 'fichierOuvrir(${1:nomFichier})' },
-        'fichierfermer': { sig: 'fichierFermer([handle : entier])', snippet: 'fichierFermer(${1:handle})' },
-        'fichierlire': { sig: 'fichierLire([handle : entier]) : chaîne', snippet: 'fichierLire(${1:handle})' },
-        'fichierfin': { sig: 'fichierFin([handle : entier]) : booléen', snippet: 'fichierFin(${1:handle})' },
-        'fichiercreer': { sig: 'fichierCréer(nom : chaîne) : entier', snippet: 'fichierCréer(${1:nomFichier})' },
-        'fichierecrire': { sig: 'fichierÉcrire(handle : entier, valeur)', snippet: 'fichierÉcrire(${1:handle}, ${2:valeur})' },
-        'comparaison': { sig: 'comparaison(a, b) : booléen', snippet: 'comparaison(${1:a}, ${2:b})' },
-        'tete': { sig: 'tete(l : Liste) : entier', snippet: 'tete(${1:l})' },
-        'val': { sig: 'val(l : Liste, p : entier) : élément', snippet: 'val(${1:l}, ${2:p})' },
-        'suc': { sig: 'suc(l : Liste, p : entier) : entier', snippet: 'suc(${1:l}, ${2:p})' },
-        'finliste': { sig: 'finListe(l : Liste, p : entier) : booléen', snippet: 'finListe(${1:l}, ${2:p})' },
-        'listevide': { sig: 'listeVide() : Liste', snippet: 'listeVide()' },
-        'ajoutteteliste': { sig: 'ajoutTeteListe(l : Liste, v) : Liste', snippet: 'ajoutTeteListe(${1:l}, ${2:v})' },
-        'suppressionteteliste': { sig: 'suppressionTeteListe(l : Liste) : Liste', snippet: 'suppressionTeteListe(${1:l})' },
-        'ajoutqueueliste': { sig: 'ajoutQueueListe(l : Liste, v) : Liste', snippet: 'ajoutQueueListe(${1:l}, ${2:v})' },
-        'suppressionqueueliste': { sig: 'suppressionQueueListe(l : Liste) : Liste', snippet: 'suppressionQueueListe(${1:l})' },
-        'ajoutliste': { sig: 'ajoutListe(l : Liste, p : entier, v) : Liste', snippet: 'ajoutListe(${1:l}, ${2:p}, ${3:v})' },
-        'suppressionliste': { sig: 'suppressionListe(l : Liste, p : entier) : Liste', snippet: 'suppressionListe(${1:l}, ${2:p})' },
-        'changeliste': { sig: 'changeListe(l : Liste, p : entier, v) : Liste', snippet: 'changeListe(${1:l}, ${2:p}, ${3:v})' },
-        'tetels': { sig: 'teteLS(l : ListeSym) : place', snippet: 'teteLS(${1:l})' },
-        'queuels': { sig: 'queueLS(l : ListeSym) : place', snippet: 'queueLS(${1:l})' },
-        'valls': { sig: 'valLS(l : ListeSym, p : place) : élément', snippet: 'valLS(${1:l}, ${2:p})' },
-        'sucls': { sig: 'sucLS(l : ListeSym, p : place) : place', snippet: 'sucLS(${1:l}, ${2:p})' },
-        'precls': { sig: 'precLS(l : ListeSym, p : place) : place', snippet: 'precLS(${1:l}, ${2:p})' },
-        'finls': { sig: 'finLS(l : ListeSym, p : place) : booléen', snippet: 'finLS(${1:l}, ${2:p})' },
-        'videls': { sig: 'videLS() : ListeSym', snippet: 'videLS()' },
-        'ajouttetels': { sig: 'ajoutTeteLS(l : ListeSym, v)', snippet: 'ajoutTeteLS(${1:l}, ${2:v})' },
-        'suppressiontetels': { sig: 'suppressionTeteLS(l : ListeSym)', snippet: 'suppressionTeteLS(${1:l})' },
-        'ajoutqueuels': { sig: 'ajoutQueueLS(l : ListeSym, v)', snippet: 'ajoutQueueLS(${1:l}, ${2:v})' },
-        'suppressionqueuels': { sig: 'suppressionQueueLS(l : ListeSym)', snippet: 'suppressionQueueLS(${1:l})' },
-        'ajoutls': { sig: 'ajoutLS(l : ListeSym, p : place, v)', snippet: 'ajoutLS(${1:l}, ${2:p}, ${3:v})' },
-        'suppressionls': { sig: 'suppressionLS(l : ListeSym, p : place)', snippet: 'suppressionLS(${1:l}, ${2:p})' },
-        'changels': { sig: 'changeLS(l : ListeSym, p : place, v)', snippet: 'changeLS(${1:l}, ${2:p}, ${3:v})' },
-        'pilevide': { sig: 'pileVide() : Pile', snippet: 'pileVide()' },
-        'sommet': { sig: 'sommet(p : Pile) : élément', snippet: 'sommet(${1:p})' },
-        'estvidepile': { sig: 'estVidePile(p : Pile) : booléen', snippet: 'estVidePile(${1:p})' },
-        'empiler': { sig: 'empiler(p : Pile, v)', snippet: 'empiler(${1:p}, ${2:v})' },
-        'depiler': { sig: 'dépiler(p : Pile)', snippet: 'depiler(${1:p})' },
-        'filevide': { sig: 'fileVide() : File', snippet: 'fileVide()' },
-        'estvidefile': { sig: 'estVideFile(f : File) : booléen', snippet: 'estVideFile(${1:f})' },
-        'enfiler': { sig: 'enfiler(f : File, v)', snippet: 'enfiler(${1:f}, ${2:v})' },
-        'defiler': { sig: 'défiler(f : File)', snippet: 'defiler(${1:f})' },
-        'premier': { sig: 'premier(f : File) : élément', snippet: 'premier(${1:f})' },
-        'ajoutfile': { sig: 'ajoutFile(f : File, v)', snippet: 'ajoutFile(${1:f}, ${2:v})' },
-        'suppressionfile': { sig: 'suppressionFile(f : File)', snippet: 'suppressionFile(${1:f})' },
-        'estfilevide': { sig: 'estFileVide(f : File) : booléen', snippet: 'estFileVide(${1:f})' },
-        'tablevide': { sig: 'tableVide() : Table', snippet: 'tableVide()' },
-        'domaine': { sig: 'domaine(t : Table) : ensemble', snippet: 'domaine(${1:t})' },
-        'accestable': { sig: 'accesTable(t : Table, clé) : valeur', snippet: 'accesTable(${1:t}, ${2:clé})' },
-        'ajouttable': { sig: 'ajoutTable(t : Table, clé, valeur)', snippet: 'ajoutTable(${1:t}, ${2:clé}, ${3:valeur})' },
-        'suppressiontable': { sig: 'suppressionTable(t : Table, clé)', snippet: 'suppressionTable(${1:t}, ${2:clé})' },
-        'changetable': { sig: 'changeTable(t : Table, clé, valeur)', snippet: 'changeTable(${1:t}, ${2:clé}, ${3:valeur})' },
-        'estdans': { sig: 'estDans(ensemble, élément) : booléen', snippet: 'estDans(${1:ensemble}, ${2:élément})' }
-    };
-
-    return PSC_DEFINITIONS.functions.map(f => {
-        const info = signatureMap[f.name.toLowerCase()];
-        const category = FUNCTION_TO_CATEGORY.get(f.name.toLowerCase()) || 'Autre';
-        return {
-            name: f.name,
-            signature: info?.sig || f.name + '(...)',
-            description: f.description || '',
-            snippet: info?.snippet || f.name + '($1)',
-            category
-        };
-    });
+    return PSC_DEFINITIONS.functions.map(f => ({
+        name: f.name,
+        signature: f.signature || `${f.name}(...)`,
+        description: f.description || '',
+        snippet: f.snippet || `${f.name}($1)`,
+        category: f.category || 'Autre'
+    }));
 }
 
 const BUILTIN_FUNCTIONS = buildBuiltinFunctions();
@@ -297,40 +202,7 @@ function resolveBaseType(rawType: string): string {
     // "Liste(...)" → "liste"
     const parenIdx = t.indexOf('(');
     const base = parenIdx !== -1 ? t.substring(0, parenIdx).trim() : t;
-    return TYPE_ALIASES[base] || base;
-}
-
-/**
- * Découpe une chaîne de paramètres par virgule tout en respectant l'imbrication
- * des parenthèses (), des crochets [] et des chevrons <> (types composites).
- */
-function splitParams(paramsStr: string): string[] {
-    if (!paramsStr || !paramsStr.trim()) return [];
-    const results: string[] = [];
-    let current = '';
-    let parenDepth = 0;
-    let bracketDepth = 0;
-    let chevronDepth = 0;
-
-    for (let i = 0; i < paramsStr.length; i++) {
-        const char = paramsStr[i];
-        if (char === '(') parenDepth++;
-        else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
-        else if (char === '[') bracketDepth++;
-        else if (char === ']') bracketDepth = Math.max(0, bracketDepth - 1);
-        else if (char === '<') chevronDepth++;
-        else if (char === '>') chevronDepth = Math.max(0, chevronDepth - 1);
-        else if (char === ',' && parenDepth === 0 && bracketDepth === 0 && chevronDepth === 0) {
-            results.push(current.trim());
-            current = '';
-            continue;
-        }
-        current += char;
-    }
-    if (current.trim()) {
-        results.push(current.trim());
-    }
-    return results;
+    return TYPE_MAPPING[base] || base;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -371,16 +243,7 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
         if (compositeMatch) {
             const typeName = compositeMatch[1];
             const fieldsStr = compositeMatch[2];
-            const fields: Array<{ name: string; type: string }> = [];
-            const fieldParts = splitParams(fieldsStr);
-            for (const part of fieldParts) {
-                const colonIdx = part.indexOf(':');
-                if (colonIdx !== -1) {
-                    const fieldName = part.substring(0, colonIdx).trim();
-                    const fieldType = part.substring(colonIdx + 1).trim();
-                    if (fieldName) fields.push({ name: fieldName, type: fieldType });
-                }
-            }
+            const fields = parseCompositeFields(fieldsStr);
             compositeTypes.set(typeName, fields);
             compositeTypes.set(typeName.toLowerCase(), fields);
             continue;
@@ -400,18 +263,12 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
                 lastFunctionLine = i;
                 currentFunctionName = funcName;
                 currentFunctionParams = [];
-                const params = splitParams(paramsStr);
+                const params = extractFunctionParams(paramsStr);
                 for (const p of params) {
-                    const cleaned = p.replace(REGEX_INOUT_PREFIX, '').trim();
-                    const colonIdx = cleaned.indexOf(':');
-                    if (colonIdx !== -1) {
-                        const pName = cleaned.substring(0, colonIdx).trim();
-                        const pType = cleaned.substring(colonIdx + 1).trim();
-                        if (pName) {
-                            currentFunctionParams.push({ name: pName, type: pType });
-                            variables.set(pName, pType);
-                            variableTypes.set(pName, resolveBaseType(pType));
-                        }
+                    if (p.name) {
+                        currentFunctionParams.push({ name: p.name, type: p.type });
+                        variables.set(p.name, p.type);
+                        variableTypes.set(p.name, resolveBaseType(p.type));
                     }
                 }
             }
@@ -495,10 +352,10 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
         }
 
         // Variables de boucle Pour
-        const pourMatch = REGEX_POUR_VAR.exec(trimmed);
-        if (pourMatch && i <= cursorLine) {
-            variables.set(pourMatch[1], 'entier');
-            variableTypes.set(pourMatch[1], 'entier');
+        const pourVar = extractPourLoopVar(trimmed);
+        if (pourVar && i <= cursorLine) {
+            variables.set(pourVar, 'entier');
+            variableTypes.set(pourVar, 'entier');
         }
 
         // Suivi des blocs ouverts
@@ -736,19 +593,8 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
 
     private buildParamSnippet(paramsStr: string): string {
         if (!paramsStr.trim()) return '';
-        const params = splitParams(paramsStr);
-        const parts: string[] = [];
-        let idx = 1;
-        for (const p of params) {
-            const cleaned = p.replace(REGEX_INOUT_PREFIX, '').trim();
-            const colonIdx = cleaned.indexOf(':');
-            const name = colonIdx !== -1 ? cleaned.substring(0, colonIdx).trim() : cleaned.trim();
-            if (name) {
-                parts.push(`\${${idx}:${name}}`);
-                idx++;
-            }
-        }
-        return parts.join(', ');
+        const params = extractFunctionParams(paramsStr);
+        return params.map((p, idx) => `\${${idx + 1}:${p.name}}`).join(', ');
     }
 
     /**

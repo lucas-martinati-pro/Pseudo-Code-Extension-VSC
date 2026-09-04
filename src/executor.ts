@@ -4,7 +4,8 @@
 
 import { PATTERNS, LUA_HELPERS } from './constants';
 import { PSC_DEFINITIONS } from './definitions';
-import { smartSplitArgs, findMatchingParen, protectStrings, restoreStrings } from './utils';
+import { REGEX_ALL_CLOSING } from './blocks';
+import { smartSplitArgs, findMatchingParen, protectStrings, restoreStrings, parseCompositeFields } from './utils';
 import { FunctionRegistry } from './functionRegistry';
 import { CompositeTypeRegistry } from './compositeTypes';
 
@@ -18,7 +19,7 @@ const REGEX_SMART_QUOTES = /[\u201c\u201d]/g;
 const REGEX_ALGORITHM = /^\s*algorithme\b/i;
 const REGEX_FIN = /^\s*Fin\b/i;
 const REGEX_DEBUT_OR_LEXIQUE = /^\s*(D\u00e9but|Lexique)\b/i;
-const REGEX_CLOSING_BLOCKS = /^\s*(Fin|fsi|fpour|ftq|ftant)\b/i;
+const REGEX_CLOSING_BLOCKS = REGEX_ALL_CLOSING;
 const REGEX_LIRE_ASSIGNMENT = /^\s*[\p{L}0-9_]+\s*(?:←|<-)\s*lire\s*\(\s*\)\s*$/iu;
 const REGEX_FONCTION = /^\s*fonction\s/i;
 const REGEX_FONCTION_NAME = /^\s*Fonction\s+([\p{L}_][\p{L}0-9_]*)/iu;
@@ -368,10 +369,7 @@ export function transpileToLua(pscCode: string): string {
         if (compositeMatch) {
             const typeName = compositeMatch[1];
             const fieldsStr = compositeMatch[2];
-            const fields = smartSplitArgs(fieldsStr).map(f => {
-                const colonIdx = f.indexOf(':');
-                return (colonIdx !== -1 ? f.substring(0, colonIdx) : f).trim();
-            }).filter(f => f.length > 0);
+            const fields = parseCompositeFields(fieldsStr).map(f => f.name);
             
             const params = fields.join(', ');
             const tableFields = fields.map(f => `${f} = ${f}`).join(', ');

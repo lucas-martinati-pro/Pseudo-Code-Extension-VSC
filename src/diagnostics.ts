@@ -1,13 +1,11 @@
 import * as vscode from 'vscode';
-import { KNOWN_IDENTIFIERS, PATTERNS, BUILTIN_FUNCTION_ARITY } from './constants';
-import { cleanLineFromComments, maskStrings, maskFieldAccess, smartSplitArgs, findMatchingParen } from './utils';
+import { KNOWN_IDENTIFIERS_LOWER, PATTERNS, BUILTIN_FUNCTION_ARITY } from './constants';
+import { cleanLineFromComments, maskStrings, maskFieldAccess, smartSplitArgs, findMatchingParen, extractFunctionParams, extractPourLoopVar } from './utils';
+import { BlockDefinition, findOpeningBlock, findClosingBlock } from './blocks';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REGEX PRÉ-COMPILÉES (éviter la recompilation à chaque ligne)
 // ═══════════════════════════════════════════════════════════════════════════════
-const REGEX_POUR_LOOP = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)/iu;
-const REGEX_PARAM_SPLIT = /,(?![^(\[]*[)\]])/g;
-const REGEX_INOUT = /\bInOut\b/i;
 const REGEX_IDENTIFIER_START = /^([\p{L}_][\p{L}0-9_]*)/u;
 const REGEX_NUMBER = /^\d+(\.\d+)?$/;
 const REGEX_IDENT_CHAR = /[\p{L}_]/u;
@@ -15,13 +13,8 @@ const REGEX_IDENT_CHAR_FULL = /[\p{L}0-9_]/u;
 const REGEX_IDENTIFIER_EXTRACT = /^[\p{L}_][\p{L}0-9_]*/u;
 const REGEX_WHITESPACE = /\s/;
 
-import { BlockDefinition, findOpeningBlock, findClosingBlock } from './blocks';
-
 const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
 const REGEX_VAR_DECL_IN_LEXIQUE = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)*)\s*:\s*.+/iu;
-
-// Cache pour les identifiants connus en minuscules (optimisation lookup)
-const KNOWN_IDENTIFIERS_LOWER = new Set([...KNOWN_IDENTIFIERS].map(id => id.toLowerCase()));
 
 // Informations sur les blocs ouverts
 interface BlockInfo {
@@ -113,12 +106,11 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         if (PATTERNS.COMPOSITE_TYPE.test(trimmedText)) continue;
 
         // ─── Détection des blocs ouvrants ───
-        const isOpeningBlock = PATTERNS.OPENING_BLOCK.test(trimmedText);
+        const openingBlock = findOpeningBlock(trimmedText);
         const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(trimmedText);
-        const pourMatch = REGEX_POUR_LOOP.exec(trimmedText);
+        const pourVar = extractPourLoopVar(trimmedText);
 
         // Suivi des blocs ouvrants
-        const openingBlock = findOpeningBlock(trimmedText);
         if (openingBlock) {
             blockStack.push({ block: openingBlock, lineNumber: lineIndex, lineText: trimmedText });
         }
@@ -183,42 +175,16 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         }
 
         // ─── Gestion des portées (scope) ───
-        if (isOpeningBlock || funcMatch || pourMatch) {
+        if (openingBlock || funcMatch || pourVar) {
             const newScope = new Set<string>();
             if (funcMatch) {
-                let paramsString = funcMatch[2];
-
-                // Trouver la parenthèse fermante
-                let depth = 0;
-                let endOfParams = -1;
-                const len = paramsString.length;
-                for (let i = 0; i < len; i++) {
-                    const c = paramsString[i];
-                    if (c === '(') depth++;
-                    else if (c === ')') {
-                        if (--depth < 0) {
-                            endOfParams = i;
-                            break;
-                        }
-                    }
-                }
-
-                if (endOfParams !== -1) {
-                    paramsString = paramsString.substring(0, endOfParams);
-                }
-
-                // Extraire les noms de paramètres
-                const params = paramsString.split(REGEX_PARAM_SPLIT);
+                const params = extractFunctionParams(funcMatch[2]);
                 for (const p of params) {
-                    const paramParts = p.trim().split(':');
-                    if (paramParts.length >= 1) {
-                        const varName = paramParts[0].replace(REGEX_INOUT, '').trim();
-                        if (varName) newScope.add(varName);
-                    }
+                    newScope.add(p.name);
                 }
             }
-            if (pourMatch) {
-                newScope.add(pourMatch[1]);
+            if (pourVar) {
+                newScope.add(pourVar);
             }
             scopeStack.push(newScope);
         }

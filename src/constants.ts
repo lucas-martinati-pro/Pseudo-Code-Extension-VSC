@@ -45,6 +45,9 @@ export const KNOWN_IDENTIFIERS = new Set([
     'lexique', 'fin_ligne'
 ]);
 
+// Identifiants connus en minuscules pour comparaison insensible à la casse
+export const KNOWN_IDENTIFIERS_LOWER = new Set([...KNOWN_IDENTIFIERS].map(id => id.toLowerCase()));
+
 // Patterns regex réutilisables
 export const PATTERNS = {
     // Identifiants

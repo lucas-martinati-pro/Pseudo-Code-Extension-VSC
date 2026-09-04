@@ -3,7 +3,7 @@
  */
 
 import { PATTERNS } from './constants';
-import { smartSplitArgs, findMatchingParen } from './utils';
+import { smartSplitArgs, findMatchingParen, parseCompositeFields } from './utils';
 
 export interface CompositeField {
     name: string;
@@ -35,18 +35,7 @@ export class CompositeTypeRegistry {
             if (match) {
                 const typeName = match[1];
                 const fieldsStr = match[2];
-                const fields: CompositeField[] = [];
-
-                const fieldParts = fieldsStr.split(',');
-                for (const fieldPart of fieldParts) {
-                    const fieldMatch = PATTERNS.COMPOSITE_FIELD.exec(fieldPart.trim());
-                    if (fieldMatch) {
-                        fields.push({
-                            name: fieldMatch[1],
-                            type: fieldMatch[2].trim()
-                        });
-                    }
-                }
+                const fields = parseCompositeFields(fieldsStr);
 
                 // Stocker avec clé en minuscules pour recherche insensible à la casse
                 this.types.set(typeName.toLowerCase(), { name: typeName, fields });

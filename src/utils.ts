@@ -223,12 +223,86 @@ export function isSimpleIdentifier(identifier: string): boolean {
     return REGEX_SIMPLE_IDENTIFIER.test(identifier);
 }
 
+const REGEX_POUR_VAR = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)/iu;
+
+/**
+ * Extrait le nom de la variable d'itération d'une boucle Pour.
+ * Supporte : 'Pour i de ...', 'Pour i allant de ...', 'Pour elem de tab Faire'
+ */
+export function extractPourLoopVar(lineText: string): string | undefined {
+    const match = REGEX_POUR_VAR.exec(lineText);
+    return match ? match[1] : undefined;
+}
+
+/**
+ * Découpe une chaîne de paramètres ou de champs par virgule tout en respectant
+ * l'imbrication des parenthèses (), crochets [] et chevrons <> (types composites).
+ */
+export function smartSplitParams(paramsStr: string): string[] {
+    if (!paramsStr || !paramsStr.trim()) return [];
+    const results: string[] = [];
+    let current = '';
+    let parenDepth = 0;
+    let bracketDepth = 0;
+    let chevronDepth = 0;
+
+    for (let i = 0; i < paramsStr.length; i++) {
+        const char = paramsStr[i];
+        if (char === '(') parenDepth++;
+        else if (char === ')') parenDepth = Math.max(0, parenDepth - 1);
+        else if (char === '[') bracketDepth++;
+        else if (char === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+        else if (char === '<') chevronDepth++;
+        else if (char === '>') chevronDepth = Math.max(0, chevronDepth - 1);
+        else if (char === ',' && parenDepth === 0 && bracketDepth === 0 && chevronDepth === 0) {
+            results.push(current.trim());
+            current = '';
+            continue;
+        }
+        current += char;
+    }
+    if (current.trim()) {
+        results.push(current.trim());
+    }
+    return results;
+}
+
+/**
+ * Parse les champs d'un type composite : 'champ1 : type1, champ2 : type2'
+ */
+export function parseCompositeFields(fieldsStr: string): Array<{ name: string; type: string }> {
+    if (!fieldsStr || !fieldsStr.trim()) return [];
+    const parts = smartSplitParams(fieldsStr);
+    const fields: Array<{ name: string; type: string }> = [];
+
+    for (const part of parts) {
+        const colonIdx = part.indexOf(':');
+        if (colonIdx !== -1) {
+            const name = part.substring(0, colonIdx).trim();
+            const type = part.substring(colonIdx + 1).trim();
+            if (name) {
+                fields.push({ name, type });
+            }
+        }
+    }
+
+    return fields;
+}
+
+export interface FunctionParamInfo {
+    name: string;
+    type: string;
+    isInOut: boolean;
+    arrayStartIndex?: number;
+    arrayStartIndices?: Array<string | number>;
+}
+
 /**
  * Extrait les paramètres d'une signature de fonction
  * OPTIMISÉ: Boucle for-of et regex pré-compilée
  * Détecte aussi les indices de départ de tableaux dans la syntaxe: tableau type[x .. ...]
  */
-export function extractFunctionParams(paramsString: string): Array<{ name: string; isInOut: boolean; arrayStartIndex?: number; arrayStartIndices?: Array<string | number> }> {
+export function extractFunctionParams(paramsString: string): FunctionParamInfo[] {
     const trimmed = paramsString.trim();
     if (!trimmed) return [];
 
@@ -249,8 +323,8 @@ export function extractFunctionParams(paramsString: string): Array<{ name: strin
     }
 
     const paramStr = endOfParams !== -1 ? paramsString.substring(0, endOfParams) : paramsString;
-    const parts = smartSplitArgs(paramStr);
-    const params: Array<{ name: string; isInOut: boolean; arrayStartIndex?: number; arrayStartIndices?: Array<string | number> }> = [];
+    const parts = smartSplitParams(paramStr);
+    const params: FunctionParamInfo[] = [];
 
     for (const part of parts) {
         const colonIdx = part.indexOf(':');
@@ -279,7 +353,7 @@ export function extractFunctionParams(paramsString: string): Array<{ name: strin
         }
 
         if (name) {
-            params.push({ name, isInOut, arrayStartIndex, arrayStartIndices });
+            params.push({ name, type: typePart, isInOut, arrayStartIndex, arrayStartIndices });
         }
     }
 

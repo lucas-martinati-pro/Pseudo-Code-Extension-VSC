@@ -2,13 +2,14 @@
  * Gestion des informations sur les fonctions déclarées (pour gérer les paramètres InOut)
  */
 
-import { PATTERNS } from './constants';
-import { extractFunctionParams, isSimpleIdentifier } from './utils';
+import { PATTERNS, KNOWN_IDENTIFIERS_LOWER } from './constants';
+import { extractFunctionParams, isSimpleIdentifier, extractPourLoopVar } from './utils';
 
 export interface ParamInfo {
     name: string;
     isInOut: boolean;
     arrayStartIndex?: number;
+    arrayStartIndices?: Array<string | number>;
 }
 
 export interface FunctionInfo {
@@ -24,7 +25,7 @@ export interface FunctionInfo {
 }
 
 /**
- * Registre global des fonctions
+ * Registre global des fonctions Pseudo-Code
  */
 export class FunctionRegistry {
     private functions = new Map<string, FunctionInfo>();
@@ -100,16 +101,8 @@ export class FunctionRegistry {
         const paramSet = new Set(paramNames);
 
         const REGEX_ASSIGN = /^\s*([\p{L}_][\p{L}0-9_]*)(?:\[[^\]]*\]|\.[\p{L}_][\p{L}0-9_]*)*\s*(?:←|<-)/u;
-        const REGEX_POUR = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)\s+(?:allant\s+)?de\b/iu;
-        const REGEX_POUR_TABLE = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)\s+de\s+[\p{L}_][\p{L}0-9_]*\s+Faire\b/iu;
         const REGEX_DECL = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)*)\s*:\s*(?:entier|r[eé]el|bool[eé]en|cha[iî]ne|caract[eè]re|tableau|liste|pile|file|table|[\p{L}_][\p{L}0-9_]*)/iu;
         const REGEX_ARRAY_DECL = /^\s*([\p{L}_][\p{L}0-9_]*)\s*(?:=|\u2190|<-)\s*tableau\b/iu;
-
-        const RESERVED = new Set([
-            'si', 'sinon', 'fsi', 'pour', 'fpour', 'tant', 'ftq', 'ftant', 'début', 'debut', 'fin',
-            'retourner', 'retourne', 'alors', 'faire', 'vrai', 'faux', 'nil', 'et', 'ou', 'non', 'mod',
-            'écrire', 'ecrire', 'lire', 'inout', 'fin_ligne'
-        ]);
 
         for (const line of bodyLines) {
             const cleanLine = line.replace(/\/\/.*/, '').trim();
@@ -118,7 +111,7 @@ export class FunctionRegistry {
             const assignMatch = REGEX_ASSIGN.exec(cleanLine);
             if (assignMatch) {
                 const varName = assignMatch[1];
-                if (!paramSet.has(varName) && !RESERVED.has(varName.toLowerCase())) {
+                if (!paramSet.has(varName) && !KNOWN_IDENTIFIERS_LOWER.has(varName.toLowerCase())) {
                     localVars.add(varName);
                 }
             }
@@ -126,16 +119,15 @@ export class FunctionRegistry {
             const arrMatch = REGEX_ARRAY_DECL.exec(cleanLine);
             if (arrMatch) {
                 const varName = arrMatch[1];
-                if (!paramSet.has(varName) && !RESERVED.has(varName.toLowerCase())) {
+                if (!paramSet.has(varName) && !KNOWN_IDENTIFIERS_LOWER.has(varName.toLowerCase())) {
                     localVars.add(varName);
                 }
             }
 
-            const pourMatch = REGEX_POUR.exec(cleanLine) || REGEX_POUR_TABLE.exec(cleanLine);
-            if (pourMatch) {
-                const varName = pourMatch[1];
-                if (!paramSet.has(varName) && !RESERVED.has(varName.toLowerCase())) {
-                    localVars.add(varName);
+            const pourVar = extractPourLoopVar(cleanLine);
+            if (pourVar) {
+                if (!paramSet.has(pourVar) && !KNOWN_IDENTIFIERS_LOWER.has(pourVar.toLowerCase())) {
+                    localVars.add(pourVar);
                 }
             }
 
@@ -143,7 +135,7 @@ export class FunctionRegistry {
             if (declMatch && !/^\s*(?:Si|Pour|Tant|Sinon|Fonction|Algorithme)\b/i.test(cleanLine)) {
                 const names = declMatch[1].split(',').map(s => s.trim());
                 for (const name of names) {
-                    if (name && !paramSet.has(name) && !RESERVED.has(name.toLowerCase())) {
+                    if (name && !paramSet.has(name) && !KNOWN_IDENTIFIERS_LOWER.has(name.toLowerCase())) {
                         localVars.add(name);
                     }
                 }

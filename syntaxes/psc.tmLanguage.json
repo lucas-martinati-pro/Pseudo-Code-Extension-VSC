@@ -102,7 +102,7 @@
     },
     "support-functions": {
       "name": "support.function",
-      "match": "(?i)\\b(longueur|concat|souschaîne|ième|fichierouvrir|fichierfermer|fichierlire|fichierfin|chaineversentier|fichiercreer|fichierecrire|comparaison|tete|val|suc|finliste|listevide|longueurliste|acces|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|change|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|estvide|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|table|domaine|domainetable|accestable|ajouttable|suppressiontable|changetable|estdans|écrire|lire)\\b"
+      "match": "(?i)\\b(longueur|concat|souschaîne|ième|chaineversentier|fichierouvrir|fichierfermer|fichierlire|fichierfin|fichiercreer|fichierecrire|comparaison|tete|val|suc|finliste|listevide|longueurliste|acces|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|change|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|estvide|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|table|domaine|domainetable|accestable|ajouttable|suppressiontable|changetable|estdans|écrire|lire)\\b"
     },
     "storage": {
       "patterns": [
