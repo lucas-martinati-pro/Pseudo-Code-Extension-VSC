@@ -69,6 +69,34 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('PSC Language Support is now active!');
     cleanOldTempFiles();
 
+    // --- Configuration du langage (indentation automatique et règles onEnter) ---
+    context.subscriptions.push(vscode.languages.setLanguageConfiguration('psc', {
+        indentationRules: {
+            increaseIndentPattern: /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i,
+            decreaseIndentPattern: /^\s*(fin\b|fsi\b|fpour\b|ftq\b|ftant\b|sinon\b)/i
+        },
+        onEnterRules: [
+            {
+                beforeText: /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?)\s*(?:\/\/.*)?$/i,
+                afterText: /^\s*(fin|fsi|fpour|ftq|ftant|sinon)\b/i,
+                action: { indentAction: vscode.IndentAction.IndentOutdent }
+            },
+            {
+                beforeText: /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i,
+                action: { indentAction: vscode.IndentAction.Indent }
+            },
+            {
+                beforeText: /^\s*(fin|fsi|fpour|ftq|ftant)\b.*$/i,
+                action: { indentAction: vscode.IndentAction.None }
+            },
+            {
+                beforeText: /^\s*$/,
+                previousLineText: /^\s*(fin|fsi|fpour|ftq|ftant)\b.*$/i,
+                action: { indentAction: vscode.IndentAction.None }
+            }
+        ]
+    }));
+
     // --- On garde le code du formateur (toujours actif) ---
     const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider('psc', {
         provideDocumentFormattingEdits(document: vscode.TextDocument): vscode.TextEdit[] {

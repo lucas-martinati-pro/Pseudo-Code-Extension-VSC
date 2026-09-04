@@ -7,7 +7,7 @@ export function formatDocument(document: vscode.TextDocument): vscode.TextEdit[]
     const tabChar = '\t';
 
     // Patterns pour l'indentation
-    const openingPattern = /^\s*(Début|.*(Alors|Faire)\s*:)\s*$/i;
+    const openingPattern = /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i;
     const closingPattern = PATTERNS.CLOSING_KEYWORDS;
 
     // Pattern pour détecter les commentaires de bloc multi-lignes
@@ -63,8 +63,8 @@ export function formatDocument(document: vscode.TextDocument): vscode.TextEdit[]
 
         // RÈGLE 1 : Si la ligne est un mot-clé de fermeture (Fin, fsi...) ou 'Sinon' / 'Sinon si',
         // on doit DIMINUER le niveau d'indentation AVANT de l'écrire.
-        const isSinon = /^Sinon(?:\s*:)?$/i.test(trimmedText);
-        const isSinonSi = /^Sinon\s+si\b/i.test(trimmedText);
+        const isSinon = /^Sinon\s*:?\s*(?:\/\/.*)?$/i.test(trimmedText);
+        const isSinonSi = /^Sinon\s+si\b.*?\balors\s*:?\s*(?:\/\/.*)?$/i.test(trimmedText);
         if ((closingPattern.test(trimmedText) || isSinon || isSinonSi) && indentationLevel > 0) {
             indentationLevel--;
         }

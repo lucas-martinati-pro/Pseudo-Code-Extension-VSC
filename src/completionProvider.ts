@@ -39,12 +39,14 @@ const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
 const REGEX_LINE_COMMENT = /\/\/.*/;
 const REGEX_INOUT_PREFIX = /\bInOut\b\s*/i;
 
-// Contexte de ':' — ces mots-clés sont suivis de ':' mais ne déclenchent PAS la complétion de types
-const KEYWORD_COLON_CONTEXT = /(?:Alors|Faire|Sinon|Début|Lexique)\s*:\s*$/i;
+// Contexte de ':' — ces mots-clés sont suivis de ':' mais ne doivent déclencher AUCUNE complétion
+const KEYWORD_COLON_CONTEXT = /(?:Alors|Faire|Sinon|d[ée]but|Lexique)\s*:\s*$/i;
 
-// Contexte de ':' pour les déclarations de types (param, variable)
-// Matches: "varName :", "InOut param :", etc. mais PAS "Faire :"
-const TYPE_DECLARATION_COLON = /(?:^|,)\s*(?:InOut\s+)?[\p{L}_][\p{L}0-9_]*\s*:\s*$/iu;
+// Contexte de ':' pour les déclarations de types (paramètre, variable, type de retour, champ de structure)
+const TYPE_DECLARATION_COLON = /(?:(?:^|[,<(])\s*(?:InOut\s+)?[\p{L}_][\p{L}0-9_]*(?:\s+InOut)?|\))\s*:\s*$/iu;
+
+// Fin de ligne d'ouverture de bloc (avec ou sans ':') — aucune suggestion intempestive à ce moment
+const REGEX_END_OF_BLOCK_HEADER = /^(?:.*?\b(?:Alors|Faire)\s*:?|d[ée]but\s*:?|Sinon\s*:?)\s*$/i;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MÉTHODES PAR TYPE — fonctions disponibles pour chaque type de données
@@ -585,10 +587,24 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
             return this.getDotCompletions(baseVarName, analysis);
         }
 
-        // ─── Contexte : après ':' dans une déclaration → types ───
-        // Seulement si c'est un contexte de déclaration (pas après "Alors :", "Faire :", etc.)
-        if (/:\s*$/.test(textBeforeCursor) && TYPE_DECLARATION_COLON.test(textBeforeCursor) && !KEYWORD_COLON_CONTEXT.test(textBeforeCursor)) {
-            return this.getTypeCompletions(analysis);
+        // ─── Contexte : après ':' ───
+        if (/:\s*$/.test(textBeforeCursor)) {
+            // Après un mot-clé de bloc ("Alors :", "Faire :", "Sinon :", etc.) → AUCUNE complétion
+            if (KEYWORD_COLON_CONTEXT.test(textBeforeCursor)) {
+                return [];
+            }
+            // Après une déclaration (variable, paramètre, retour de fonction, champ) → types
+            if (TYPE_DECLARATION_COLON.test(textBeforeCursor)) {
+                return this.getTypeCompletions(analysis);
+            }
+            // Tout autre contexte avec ':' → pas de complétion
+            return [];
+        }
+
+        // ─── Contexte : fin de ligne d'ouverture de bloc ("Alors", "Faire", "Début", etc.) ───
+        // L'en-tête du bloc est terminé, l'utilisateur va faire Entrée → aucune complétion
+        if (REGEX_END_OF_BLOCK_HEADER.test(trimmedBefore)) {
+            return [];
         }
 
         // ─── Contexte général : tout le reste ───
@@ -834,25 +850,30 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
             items.push(item);
         }
 
-        // Fermetures de blocs avec haute priorité
-        for (let i = analysis.openBlocks.length - 1; i >= 0; i--) {
-            const block = analysis.openBlocks[i];
-            let closingKeyword: string;
-            let closingDetail: string;
+        // Fermetures de blocs (uniquement si on n'est pas déjà sur une ligne d'ouverture de bloc)
+        const isOpeningLine = /^\s*(?:Si\b|Pour\b|Tant\s+que\b|Algorithme\b|Fonction\b|Procédure\b|d[ée]but\b)/i.test(_trimmedBefore) ||
+                              /\b(?:Alors|Faire)\b/i.test(_trimmedBefore);
 
-            switch (block.type) {
-                case 'Si': closingKeyword = 'fsi'; closingDetail = `Ferme le Si de la ligne ${block.line + 1}`; break;
-                case 'Pour': closingKeyword = 'fpour'; closingDetail = `Ferme le Pour de la ligne ${block.line + 1}`; break;
-                case 'TantQue': closingKeyword = 'ftq'; closingDetail = `Ferme le Tant que de la ligne ${block.line + 1}`; break;
-                case 'Début': closingKeyword = 'Fin'; closingDetail = `Ferme le Début de la ligne ${block.line + 1}`; break;
-                default: continue;
+        if (!isOpeningLine) {
+            for (let i = analysis.openBlocks.length - 1; i >= 0; i--) {
+                const block = analysis.openBlocks[i];
+                let closingKeyword: string;
+                let closingDetail: string;
+
+                switch (block.type) {
+                    case 'Si': closingKeyword = 'fsi'; closingDetail = `Ferme le Si de la ligne ${block.line + 1}`; break;
+                    case 'Pour': closingKeyword = 'fpour'; closingDetail = `Ferme le Pour de la ligne ${block.line + 1}`; break;
+                    case 'TantQue': closingKeyword = 'ftq'; closingDetail = `Ferme le Tant que de la ligne ${block.line + 1}`; break;
+                    case 'Début': closingKeyword = 'Fin'; closingDetail = `Ferme le Début de la ligne ${block.line + 1}`; break;
+                    default: continue;
+                }
+
+                const item = new vscode.CompletionItem(closingKeyword, vscode.CompletionItemKind.Keyword);
+                item.detail = closingDetail;
+                item.sortText = `1_${String(analysis.openBlocks.length - i).padStart(2, '0')}_${closingKeyword}`;
+                // Ne jamais forcer preselect: true pour éviter d'insérer fsi involontairement avec Entrée
+                items.push(item);
             }
-
-            const item = new vscode.CompletionItem(closingKeyword, vscode.CompletionItemKind.Keyword);
-            item.detail = closingDetail;
-            item.sortText = `1_${String(analysis.openBlocks.length - i).padStart(2, '0')}_${closingKeyword}`;
-            item.preselect = i === analysis.openBlocks.length - 1;
-            items.push(item);
         }
 
         // Opérateurs logiques

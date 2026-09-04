@@ -142,7 +142,7 @@
         "editor.suggest.insertMode": "replace",
         "editor.wordBasedSuggestions": "off",
         "editor.suggest.localityBonus": true,
-        "editor.acceptSuggestionOnCommitCharacter": true
+        "editor.autoIndent": "full"
       }
     }
   },
