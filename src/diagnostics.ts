@@ -151,90 +151,74 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
             blockStack.push({ type: 'Début', lineNumber: lineIndex, lineText: trimmedText });
         }
 
-        // ─── Détection des blocs fermants avec vérification ───
+        // ─── Détection des blocs fermants avec recherche intelligente ───
+        // Stratégie "search-and-recover" :
+        // 1. Si le sommet de la pile correspond → pop normal
+        // 2. Sinon, chercher l'ouvrant correspondant plus bas dans la pile
+        // 3. Si trouvé : signaler les blocs intermédiaires comme non fermés (sur leur ligne d'ouverture)
+        // 4. Si non trouvé : signaler le fermant comme orphelin
+
+        const closeBlock = (closingKeyword: string, expectedType: BlockType, closingLineIndex: number, closingText: string) => {
+            if (blockStack.length === 0) {
+                // Aucun bloc ouvert → fermant orphelin
+                const range = new vscode.Range(closingLineIndex, 0, closingLineIndex, closingText.length);
+                diagnostics.push(new vscode.Diagnostic(
+                    range,
+                    `'${closingKeyword}' inattendu : aucun bloc '${expectedType}' ouvert.`,
+                    vscode.DiagnosticSeverity.Error
+                ));
+                return;
+            }
+
+            const lastBlock = blockStack[blockStack.length - 1];
+            if (lastBlock.type === expectedType) {
+                // Cas normal : le sommet correspond → pop
+                blockStack.pop();
+                return;
+            }
+
+            // Le sommet ne correspond pas → chercher l'ouvrant correspondant plus bas dans la pile
+            let matchIndex = -1;
+            for (let k = blockStack.length - 1; k >= 0; k--) {
+                if (blockStack[k].type === expectedType) {
+                    matchIndex = k;
+                    break;
+                }
+            }
+
+            if (matchIndex !== -1) {
+                // Trouvé ! Les blocs au-dessus sont non fermés → signaler chacun sur sa ligne d'ouverture
+                for (let k = blockStack.length - 1; k > matchIndex; k--) {
+                    const unclosed = blockStack[k];
+                    const unclosedLine = doc.lineAt(unclosed.lineNumber);
+                    const range = new vscode.Range(unclosed.lineNumber, 0, unclosed.lineNumber, unclosedLine.text.length);
+                    diagnostics.push(new vscode.Diagnostic(
+                        range,
+                        `Bloc '${unclosed.type}' non fermé. Il manque un '${EXPECTED_CLOSING[unclosed.type]}'.`,
+                        vscode.DiagnosticSeverity.Error
+                    ));
+                }
+                // Pop tous les blocs du sommet jusqu'à (et y compris) le match
+                blockStack.splice(matchIndex);
+            } else {
+                // Pas trouvé du tout → le fermant est orphelin
+                const range = new vscode.Range(closingLineIndex, 0, closingLineIndex, closingText.length);
+                diagnostics.push(new vscode.Diagnostic(
+                    range,
+                    `'${closingKeyword}' inattendu : aucun bloc '${expectedType}' ouvert.`,
+                    vscode.DiagnosticSeverity.Error
+                ));
+            }
+        };
+
         if (REGEX_CLOSE_FSI.test(trimmedText)) {
-            if (blockStack.length > 0) {
-                const lastBlock = blockStack[blockStack.length - 1];
-                if (lastBlock.type === 'Si') {
-                    blockStack.pop();
-                } else {
-                    // Bloc mal fermé
-                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
-                    diagnostics.push(new vscode.Diagnostic(
-                        range,
-                        `'fsi' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
-                        vscode.DiagnosticSeverity.Error
-                    ));
-                    blockStack.pop(); // On pop quand même pour éviter les cascades d'erreurs
-                }
-            } else {
-                const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
-                diagnostics.push(new vscode.Diagnostic(
-                    range,
-                    `'fsi' inattendu : aucun bloc 'Si' ouvert.`,
-                    vscode.DiagnosticSeverity.Error
-                ));
-            }
+            closeBlock('fsi', 'Si', lineIndex, trimmedText);
         } else if (REGEX_CLOSE_FPOUR.test(trimmedText)) {
-            if (blockStack.length > 0) {
-                const lastBlock = blockStack[blockStack.length - 1];
-                if (lastBlock.type === 'Pour') {
-                    blockStack.pop();
-                } else {
-                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
-                    diagnostics.push(new vscode.Diagnostic(
-                        range,
-                        `'fpour' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
-                        vscode.DiagnosticSeverity.Error
-                    ));
-                    blockStack.pop();
-                }
-            } else {
-                const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
-                diagnostics.push(new vscode.Diagnostic(
-                    range,
-                    `'fpour' inattendu : aucun bloc 'Pour' ouvert.`,
-                    vscode.DiagnosticSeverity.Error
-                ));
-            }
+            closeBlock('fpour', 'Pour', lineIndex, trimmedText);
         } else if (REGEX_CLOSE_FTQ.test(trimmedText)) {
-            if (blockStack.length > 0) {
-                const lastBlock = blockStack[blockStack.length - 1];
-                if (lastBlock.type === 'TantQue') {
-                    blockStack.pop();
-                } else {
-                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
-                    diagnostics.push(new vscode.Diagnostic(
-                        range,
-                        `'ftq' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
-                        vscode.DiagnosticSeverity.Error
-                    ));
-                    blockStack.pop();
-                }
-            } else {
-                const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
-                diagnostics.push(new vscode.Diagnostic(
-                    range,
-                    `'ftq' inattendu : aucun bloc 'Tant que' ouvert.`,
-                    vscode.DiagnosticSeverity.Error
-                ));
-            }
+            closeBlock('ftq', 'TantQue', lineIndex, trimmedText);
         } else if (REGEX_CLOSE_FIN.test(trimmedText)) {
-            if (blockStack.length > 0) {
-                const lastBlock = blockStack[blockStack.length - 1];
-                if (lastBlock.type === 'Début') {
-                    blockStack.pop();
-                } else {
-                    const range = new vscode.Range(lineIndex, 0, lineIndex, trimmedText.length);
-                    diagnostics.push(new vscode.Diagnostic(
-                        range,
-                        `'Fin' inattendu : le bloc ouvert ligne ${lastBlock.lineNumber + 1} est un '${lastBlock.type}' (attendu '${EXPECTED_CLOSING[lastBlock.type]}').`,
-                        vscode.DiagnosticSeverity.Error
-                    ));
-                    blockStack.pop();
-                }
-            }
-            // Note: 'Fin' sans 'Début' n'est pas nécessairement une erreur (fin de fichier, fin d'algo)
+            closeBlock('Fin', 'Début', lineIndex, trimmedText);
         }
 
         // ─── Gestion des portées (scope) ───
