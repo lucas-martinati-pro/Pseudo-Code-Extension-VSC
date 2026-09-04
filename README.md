@@ -243,4 +243,4 @@ Les contributions, les rapports de bugs et les suggestions de fonctionnalités s
 
 ## 🤖 Développement & Intelligence Artificielle
 
-Ce projet est développé et maintenu avec l'assistance d'outils d'intelligence artificielle (utilisés notamment pour l'aide à la conception, l'optimisation du code et la documentation), sous supervision et contrôle humain rigoureux.
+Ce projet est développé en adoptant une approche de **pair-programming avec l'intelligence artificielle** (*vibe coding*). Les outils d'IA sont activement utilisés pour accélérer le prototypage, explorer de nouvelles fonctionnalités et assister la conception technique ou la documentation.
