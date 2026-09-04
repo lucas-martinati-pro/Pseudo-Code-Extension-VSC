@@ -147,10 +147,10 @@ VSCodium n'utilisant pas par défaut la marketplace propriétaire de Microsoft, 
 #### Via le terminal (Ligne de commande) :
 ```bash
 # Pour VSCodium
-codium --install-extension pseudocode-interpreter-0.3.0.vsix
+codium --install-extension pseudocode-interpreter-x.x.x.vsix
 
 # Pour VS Code
-code --install-extension pseudocode-interpreter-0.3.0.vsix
+code --install-extension pseudocode-interpreter-x.x.x.vsix
 ```
 
 ---
