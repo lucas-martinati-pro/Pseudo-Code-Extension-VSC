@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { PSC_DEFINITIONS } from '../src/definitions';
+import { ALL_CLOSING_KEYWORDS } from '../src/blocks';
 
 /**
  * Générateur automatique de grammaire TextMate
@@ -125,14 +126,25 @@ if (repository['declarations']) {
     }
 }
 
+// Mots-clés de contrôle et de bloc à exclure des variables et des noms de fonctions
+const excludedKeywords = Array.from(new Set([
+    ...controlKeywords,
+    ...blockKeywords,
+    ...logicalOperators,
+    ...ALL_CLOSING_KEYWORDS,
+    'Tant(?:\\s+que)',
+    'Sinon(?:\\s+si)'
+])).filter(k => !['tant', 'que'].includes(k.toLowerCase()));
+const excludedPattern = excludedKeywords.join('|');
+
 // 7. Mettre à jour les appels de fonction pour supporter Unicode
 if (repository['function-call']) {
-    repository['function-call'].match = `(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)(${IDENT_START}${IDENT_CHAR}*)(?=\\s*\\()`;
+    repository['function-call'].match = `(?i)\\b(?!(?:${excludedPattern})\\b)(${IDENT_START}${IDENT_CHAR}*)(?=\\s*\\()`;
 }
 
 // 8. Mettre à jour les variables pour supporter Unicode
 if (repository['variables']) {
-    repository['variables'].match = `(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b`;
+    repository['variables'].match = `(?i)\\b(?!(?:${excludedPattern})\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b`;
 }
 
 // 9. Mettre à jour la boucle for pour supporter Unicode
@@ -166,7 +178,17 @@ if (repository['operators-assignment']) {
     repository['operators-assignment'].match = '(←|→)';
 }
 
-const grammarJson = JSON.stringify(grammar, null, 2);
+// Supprimer les anciens tags d'avertissement et placer _comment en haut
+delete grammar._WARNING;
+delete grammar._comment;
+
+const orderedGrammar = {
+    $schema: grammar.$schema,
+    _comment: "ATTENTION : Ce fichier est généré automatiquement par 'npm run generate-grammar' depuis src/definitions.ts et src/blocks.ts. NE PAS MODIFIER DIRECTEMENT CE FICHIER.",
+    ...grammar
+};
+
+const grammarJson = JSON.stringify(orderedGrammar, null, 2);
 fs.writeFileSync(grammarPath, grammarJson, 'utf-8');
 
 console.log('✓ Grammaire TextMate mise à jour avec succès !');

@@ -155,6 +155,86 @@ code --install-extension pseudocode-interpreter-0.3.0.vsix
 
 ---
 
+## 🛠️ Guide de Développement & Tests
+
+Ce guide s'adresse aux contributeurs et développeurs souhaitant modifier, tester ou faire évoluer l'extension.
+
+### 1. Architecture & Sources Uniques de Vérité
+
+Le projet est articulé autour de **sources uniques de vérité** pour garantir la cohérence absolue de tous les composants :
+- **[`src/definitions.ts`](src/definitions.ts)** : Registre central de tous les mots-clés, types et fonctions intégrées (arités, descriptions, signatures, snippets, catégories, équivalents et helpers Lua).
+- **[`src/blocks.ts`](src/blocks.ts)** : Définition déclarative de tous les blocs et structures de contrôle (`Si`, `Pour`, `Tant que`, `Début`...). Il alimente automatiquement le linter (*search-and-recover*), l'indentation automatique (`onEnterRules`), le formateur et les snippets de fermeture.
+- **[`syntaxes/psc.tmLanguage.json`](syntaxes/psc.tmLanguage.json)** : **Ne jamais modifier ce fichier à la main.** Il est généré automatiquement par `scripts/generate-grammar.ts` à partir de `definitions.ts` et `blocks.ts`.
+
+### 2. Commandes Utiles
+
+```bash
+# Installer les dépendances
+npm install
+
+# Compiler le projet (déclenche automatiquement generate-grammar)
+npm run compile
+
+# Mode surveillance (recompilation continue à chaque sauvegarde)
+npm run watch
+
+# Régénérer manuellement la grammaire TextMate
+npm run generate-grammar
+
+# Packager l'extension en fichier .vsix
+npm run package
+```
+
+### 3. Tester l'Extension dans VS Code / VSCodium (Extension Host)
+
+1. Ouvrez le projet dans VS Code ou VSCodium.
+2. Appuyez sur **`F5`** (ou menu *Exécuter et déboguer* > *Lancer l'extension*).
+3. Une nouvelle fenêtre VS Code s'ouvre avec l'extension active.
+4. Ouvrez n'importe quel fichier `.psc` pour tester en direct :
+   - La coloration syntaxique
+   - L'autocomplétion contextuelle et l'aide aux paramètres
+   - Le linter et les diagnostics d'erreurs en temps réel
+   - Le formatage automatique (`Alt + Maj + F`)
+   - L'exécution du code (Bouton ▶️ en haut à droite)
+
+### 4. Tester le Fichier de Démonstration (`examples/MEGA_DEMO_COMPLEXE.psc`)
+
+Le dépôt contient un fichier de démonstration et de benchmark exhaustif : [`examples/MEGA_DEMO_COMPLEXE.psc`](examples/MEGA_DEMO_COMPLEXE.psc). Il couvre l'ensemble des fonctionnalités du langage :
+- Algorithme principal et fonctions avec paramètres `InOut`
+- Structures de contrôle imbriquées (`Si / Sinon si / Sinon`, `Pour`, `Tant que`)
+- Types composites / structures personnalisées (`Point`, `Personne`...)
+- Tous les types de données abstraits (Listes, Listes Symétriques, Piles, Files, Tables)
+- Manipulation de chaînes de caractères et opérations de fichiers
+
+#### Option A : Test d'Exécution en Ligne de Commande (CLI)
+Vous pouvez transpiler et exécuter la méga-démo directement via le terminal sans lancer de fenêtre VS Code :
+
+```bash
+# 1. Compiler l'extension
+npm run compile
+
+# 2. Transpiler le pseudo-code en Lua
+node -e "
+const { transpileToLua } = require('./out/executor');
+const fs = require('fs');
+const code = fs.readFileSync('examples/MEGA_DEMO_COMPLEXE.psc', 'utf-8');
+const lua = transpileToLua(code);
+fs.writeFileSync('out_demo.lua', lua);
+console.log('✓ Transpilation réussie (' + lua.length + ' caractères générés)');
+"
+
+# 3. Exécuter avec Lua
+lua out_demo.lua
+# ou sous Linux/macOS selon votre version : lua5.4 out_demo.lua
+```
+
+#### Option B : Test Graphique dans l'Hôte d'Extension
+1. Lancez l'hôte avec **`F5`**.
+2. Ouvrez le fichier `examples/MEGA_DEMO_COMPLEXE.psc`.
+3. Cliquez sur le bouton ▶️ en haut à droite (ou tapez `Ctrl+Alt+R`) : le terminal affiche l'ensemble des résultats d'exécution.
+
+---
+
 ## Contributions
 
 Les contributions, les rapports de bugs et les suggestions de fonctionnalités sont les bienvenus ! N'hésitez pas à ouvrir une "Issue" ou une "Pull Request" sur le dépôt GitHub du projet.

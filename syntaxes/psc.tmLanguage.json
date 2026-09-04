@@ -1,5 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "_comment": "ATTENTION : Ce fichier est généré automatiquement par 'npm run generate-grammar' depuis src/definitions.ts et src/blocks.ts. NE PAS MODIFIER DIRECTEMENT CE FICHIER.",
   "name": "PseudoCode",
   "scopeName": "source.psc",
   "patterns": [
@@ -174,7 +175,7 @@
       ]
     },
     "function-call": {
-      "match": "(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)(?=\\s*\\()",
+      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)(?=\\s*\\()",
       "captures": {
         "1": {
           "name": "entity.name.function.call"
@@ -220,8 +221,7 @@
     },
     "variables": {
       "name": "variable.other",
-      "match": "(?i)\\b(?!(?:Si|Alors|Sinon|fsi|Pour|Faire|fpour|Tant(?:\\s+que)|ftq|ftant|Début|Fin|et|ou|non)\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
+      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
     }
-  },
-  "_WARNING": "Ce fichier est généré automatiquement par scripts/generate-grammar.ts - NE PAS MODIFIER MANUELLEMENT - Modifier src/definitions.ts à la place"
+  }
 }

@@ -1,6 +1,17 @@
 /**
- * Registre central des définitions pour le langage Pseudo-Code.
- * Ce fichier sert de source de vérité pour les types, fonctions et mots-clés.
+ * Registre central des définitions pour le langage Pseudo-Code (Source Unique de Vérité).
+ * 
+ * ⚠️ IMPORTANT : Ce fichier alimente automatiquement l'ensemble de l'extension :
+ * 1. La grammaire TextMate (syntaxes/psc.tmLanguage.json) :
+ *    - Les fonctions intégrées (support-functions), les mots-clés, opérateurs et types y sont
+ *      synchronisés automatiquement par 'npm run generate-grammar' (inclus dans 'npm run compile').
+ *    - NE PAS modifier manuellement support-functions dans syntaxes/psc.tmLanguage.json.
+ * 2. Le Linter / Diagnostics :
+ *    - KNOWN_IDENTIFIERS et BUILTIN_FUNCTION_ARITY sont directement dérivés de ce registre.
+ * 3. L'Autocomplétion & Signature Help :
+ *    - Les signatures, snippets, catégories et documentations proviennent de ce registre.
+ * 4. L'Exécuteur / Transpileur vers Lua :
+ *    - Les fonctions et opérateurs sont transpilés via les équivalents et helpers Lua définis ici.
  */
 
 export interface PscType {

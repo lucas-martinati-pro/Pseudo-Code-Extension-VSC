@@ -6,7 +6,8 @@
     },
     "include": [
         "scripts/**/*",
-        "src/definitions.ts"
+        "src/definitions.ts",
+        "src/blocks.ts"
     ],
     "exclude": []
 }
