@@ -1,62 +1,59 @@
-# 🚀 Release v0.4.0 — PseudoCode Language Interpreter
+# 🚀 Release v0.4.1 — PseudoCode Language Interpreter
 
-Cette version **v0.4.0** est une mise à jour majeure axée sur la **robustesse du transpileur d'exécution**, le **scoping strict des variables locales et de récursion**, le **support avancé des tableaux multidimensionnels avec bornes personnalisées**, la **génération automatique des constructeurs de structures composites**, ainsi que l'enrichissement de l'autocomplétion, du survol (Hover) et du linter.
+Cette mise à jour apporte des améliorations majeures sur l'architecture du langage, la fiabilité des diagnostics, l'expérience de frappe avec l'indentation automatique native, et la personnalisation de l'extension via de nouveaux paramètres utilisateurs.
 
 ---
 
 ## ✨ Nouveautés & Améliorations Majeures
 
-### 🧠 Scoping Strict des Variables Locales & Fonctions Récursives
-- **Scoping par fonction :** Les variables locales et variables d'index de boucle sont déclarées localement (`local var`) au sommet de chaque fonction.
-- **Isolation de la récursion :** Les appels récursifs (ex: Triangle de Pascal, Hanoï, Factorielle, QuickSort) ne partagent plus d'espace mémoire global et n'écrasent plus leurs variables locales.
-- **Support des paramètres `InOut` :** Réaffectation automatique des variables passées par référence lors des retours de fonctions.
-
-### 🔢 Tableaux à Bornes Libres & Matrices Multidimensionnelles
-- **Indices de départ personnalisés :** Déclaration et indexation de tableaux avec n'importe quelle borne :
-  - 0-based : `tab ← tableau entier[0 .. n - 1]`
-  - 1-based : `tab ← tableau entier[1 .. n]`
-  - Bornes relatives / négatives : `tab ← tableau entier[-5 .. 5]`
-- **Matrices multidimensionnelles à bornes hétérogènes :** `M ← tableau entier[1 .. 3, 0 .. 5]` avec instanciation automatique des sous-tables Lua et conversion des accès `M[i, j]`.
-- **Récursivité sur les indices imbriqués :** `a[b[i]]` transforme correctement tous les niveaux d'accès.
-- **Protection des chaînes et mots-clés :** `retourner [1, 2]` et les chaînes contenant des crochets (`"élément [0]"`) sont préservés fidèlement.
-
-### 🏗️ Types Composites (Enregistrements / Structures)
-- **Génération automatique de constructeurs :** La déclaration `Etudiant = < nom : chaîne, age : entier >` crée automatiquement le constructeur `Etudiant(nom, age)`.
-- **Affectation de propriétés d'objets :** Prise en charge des assignations de champs (`p.age = 20`, `tab[i].val = 5`).
-
-### 📦 TDAs Complets & Prêts à l'Emploi
-- **TDA Liste :** `listeVide`, `ajoutTeteListe`, `ajoutQueueListe`, `val`, `suc`, `finListe`, `longueurListe`, `acces`.
-- **TDA Pile (LIFO) :** `pileVide`, `empiler`, `depiler`, `sommet`, `estVidePile`.
-- **TDA File (FIFO) :** `fileVide`, `enfiler`, `defiler`, `premier`, `estVideFile`.
-- **TDA Liste Symétrique :** `videLS`, `ajoutTeteLS`, `ajoutQueueLS`, `teteLS`, `queueLS`, `sucLS`, `precLS`, `suppressionLS`.
-- **TDA Table (Map / Dictionnaire) :** `Table("clé" → "valeur")`, `ajoutTable`, `suppressionTable`, `changeTable`, `accesTable`, `domaineTable`, `estDans`.
-
-### 🔍 Diagnostic & Linter Zéro Faux Positif
-- **Reconnaissance des en-têtes `Algorithme <Nom>` et `Lexique` :** Plus de faux avertissement sur le nom de l'algorithme.
-- **Support de tous les opérateurs d'affectation :** Prise en charge transparente de `←`, `<-` et `=`.
-- **Enrichissement de `KNOWN_IDENTIFIERS` :** Intégration automatique de toutes les fonctions de la bibliothèque standard dans le linter.
-
-### 💡 Autocomplétion, Hover & IntelliSense
-- **Hover sur fonctions intégrées :** Affichage de la documentation, de la signature et de la description au survol de la souris.
-- **Go to Definition :** Navigation vers la déclaration des fonctions et types personnalisés.
-- **Déduplication des suggestions :** Nettoyage des doublons (`écrire`, `lire`) dans la complétion.
+### 🏗️ Architecture Centralisée & Source Unique de Vérité (SSOT)
+- **Registre des définitions centralisé (`src/definitions.ts`) :** Définition unifiée de tous les mots-clés, types, opérateurs, fonctions standards (avec arités, descriptions, signatures, équivalents et helpers Lua).
+- **Gestionnaire déclaratif des blocs (`src/blocks.ts`) :** Définition centralisée des structures de contrôle (`Si`, `Pour`, `Tant que`, `Début`...), de leurs continuations (`Sinon`, `Sinon si`), de leurs patterns d'ouverture/fermeture et de leurs snippets associés.
+- **Génération automatique de la grammaire TextMate (`scripts/generate-grammar.ts`) :** La syntaxe de coloration (`syntaxes/psc.tmLanguage.json`) est désormais générée automatiquement à partir des définitions TypeScript lors du `npm run compile`. Cela garantit une synchronisation parfaite et élimine tout risque de divergence entre coloration, autocomplétion et exécution.
 
 ---
 
-## 📦 Installation & Compatibilité
+### 🔍 Linter Intelligent & Stratégie "Search-and-Recover"
+- **Analyse robuste de la pile de blocs :** Le linter analyse désormais la structure imbriquée des blocs avec un algorithme intelligent de récupération (*search-and-recover*).
+- **Précision chirurgicale des erreurs :** Si un mot-clé de fermeture ne correspond pas au bloc attendu, le linter remonte la pile pour identifier les blocs intermédiaires non fermés et surligne directement la ligne d'ouverture manquante (au lieu de déclencher des erreurs en cascade sur le reste du fichier).
+- **Détection des fermants orphelins :** Détection et signalement clairs des fermetures inattendues (ex: un `fsi` sans aucun `Si` ouvert).
+
+---
+
+### ⚡ Indentation Automatique Native (`onEnterRules` & Formateur)
+- **Indentation automatique à la frappe :** Configuration native via l'API VS Code (`setLanguageConfiguration`) pour indenter automatiquement le curseur lors de l'appui sur `Entrée` après une ligne d'ouverture (`Début`, `Alors`, `Faire`, `Sinon`, `Sinon si`, `Lexique`).
+- **Gestion de la dé-indentation (*outdent*) :** Réduction immédiate et fluide du niveau d'indentation lors de la saisie des mots-clés de fermeture (`fsi`, `fpour`, `ftq`, `Fin`, `Sinon`).
+- **Affinage du formateur de document (`Alt + Maj + F`) :** Prise en compte améliorée des en-têtes avec deux-points optionnels, des clauses alternatives et des commentaires en bout de ligne.
+
+---
+
+### 💡 IntelliSense & Autocomplétion Contextuelle Affinée
+- **Complétion ultra-contextuelle :** 
+  - Après `:` : suggestion des types uniquement en contexte de déclaration (évite les suggestions parasites après `Alors :`, `Faire :`, etc.).
+  - Fin d'en-tête de bloc : neutralisation des propositions non pertinentes lorsque l'utilisateur s'apprête à passer à la ligne.
+- **Fermeture intelligente de blocs :** Proposition dynamique des fermetures adaptées aux blocs ouverts (ex: *« Ferme le Si de la ligne X »*), positionnées intelligemment sans pré-sélection bloquante pour ne pas interférer avec la frappe naturelle.
+
+---
+
+### ⚙️ Paramètres Utilisateur & Synchronisation en Temps Réel
+Trois nouveaux paramètres de configuration font leur apparition dans les paramètres VS Code (`psc.*`) avec prise en compte instantanée à chaud :
+- **`psc.execution.enabled`** *(booléen, défaut: `true`)* : Active ou désactive le bouton et la commande d'exécution du pseudo-code.
+- **`psc.linter.enabled`** *(booléen, défaut: `true`)* : Active ou désactive l'analyse statique et efface immédiatement les marqueurs d'erreur en cas de désactivation.
+- **`psc.intellisense.enabled`** *(booléen, défaut: `true`)* : Permet de désactiver/activer à la volée tous les fournisseurs d'autocomplétion, hover, signature et navigation vers les définitions.
+
+---
+
+### 🛠️ Guide Développeur & Outils de Contribution
+- **Documentation complète dans le `README.md` :** Ajout d'une section exhaustive pour les contributeurs détaillant l'architecture du projet, les commandes de build (`compile`, `generate-grammar`, `package`), le lancement de l'hôte d'extension (`F5`) et les tests en ligne de commande de la méga-démo (`examples/MEGA_DEMO_COMPLEXE.psc`).
+
+---
+
+## 📦 Installation & Mise à Jour
 
 ### Sur Visual Studio Code :
-Installez l'extension directement depuis la [Marketplace Visual Studio](https://marketplace.visualstudio.com/items?itemName=LucasM54.PseudoCode-Interpreter) ou recherchez `PseudoCode-Interpreter` dans l'onglet Extensions (`Ctrl+Shift+X`).
+L'extension se met à jour automatiquement. Vous pouvez également la retrouver sur le [Marketplace Visual Studio](https://marketplace.visualstudio.com/items?itemName=LucasM54.PseudoCode-Interpreter) ou dans l'onglet Extensions (`Ctrl+Shift+X`) en cherchant `PseudoCode-Interpreter`.
 
 ### Sur VSCodium / Installation Manuelle (.VSIX) :
-1. Téléchargez le fichier **`pseudocode-interpreter-0.4.0.vsix`** ci-dessous (section *Assets*).
-2. Dans VSCodium (ou VS Code), ouvrez l'onglet **Extensions** (`Ctrl+Shift+X`).
-3. Cliquez sur le menu `···` en haut à droite > **Installer depuis un VSIX...** (*Install from VSIX...*).
-4. Sélectionnez le fichier téléchargé.
-
----
-
-## 🧪 Benchmark & Fichier de Démonstration
-
-Un fichier complet de benchmark regroupant toutes les fonctionnalités et algorithmes avancés est disponible dans le dépôt :
-📁 **`examples/MEGA_DEMO_COMPLEXE.psc`**
+1. Téléchargez le fichier `.vsix` joint à cette release (section *Assets* ci-dessous).
+2. Dans VS Code ou VSCodium, ouvrez l'onglet **Extensions** (`Ctrl+Shift+X`).
+3. Cliquez sur le menu `···` (en haut à droite) > **Installer depuis un VSIX...** (*Install from VSIX...*).
