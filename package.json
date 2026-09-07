@@ -152,7 +152,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "node test-special-chars.js && node test-all-files.js",
+    "test": "node test-special-chars.js && node test-all-files.js && node test-completions.js",
     "package": "npx @vscode/vsce package"
   },
   "devDependencies": {

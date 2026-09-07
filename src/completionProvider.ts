@@ -257,9 +257,12 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
             const returnMatch = trimmed.match(/\)\s*:\s*(.+)$/i);
             const returnType = returnMatch ? returnMatch[1].trim() : '';
             const fullSig = `${funcName}(${paramsStr})${returnType ? ' : ' + returnType : ''}`;
-            userFunctions.set(funcName, { params: paramsStr, returnType, fullSignature: fullSig });
+            // Ne pas enregistrer la fonction comme appelable si le curseur est sur sa propre ligne de déclaration
+            if (i !== cursorLine) {
+                userFunctions.set(funcName, { params: paramsStr, returnType, fullSignature: fullSig });
+            }
 
-            if (i <= cursorLine) {
+            if (i < cursorLine) {
                 lastFunctionLine = i;
                 currentFunctionName = funcName;
                 currentFunctionParams = [];
@@ -313,7 +316,7 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
 
         // Variables par affectation — essayer de deviner le type
         const assignMatch = REGEX_ASSIGNMENT.exec(trimmed);
-        if (assignMatch && i <= cursorLine) {
+        if (assignMatch && i < cursorLine) {
             const varName = assignMatch[1];
             const rhs = trimmed.substring(trimmed.indexOf('←') + 1).trim();
             let guessedType = '';
@@ -339,7 +342,7 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
 
         // Variables déclarées avec `:` hors Lexique (inline)
         // Détecte: "x : entier" au milieu du code
-        if (i <= cursorLine && !funcMatch) {
+        if (i < cursorLine && !funcMatch) {
             const inlineDecl = /^\s*([\p{L}_][\p{L}0-9_]*)\s*:\s*([\p{L}_][\p{L}0-9_]*(?:\s*[\p{L}_][\p{L}0-9_]*)?(?:\[.*?\])?)/u.exec(trimmed);
             if (inlineDecl && !/^\s*(Si|Pour|Tant|Sinon|Début|Fin|Algorithme|Fonction)\b/i.test(trimmed)) {
                 const vName = inlineDecl[1];
@@ -353,7 +356,7 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
 
         // Variables de boucle Pour
         const pourVar = extractPourLoopVar(trimmed);
-        if (pourVar && i <= cursorLine) {
+        if (pourVar && i < cursorLine) {
             variables.set(pourVar, 'entier');
             variableTypes.set(pourVar, 'entier');
         }
@@ -416,15 +419,45 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
             return this.getDotCompletions(baseVarName, analysis);
         }
 
+        // ─── Contexte : ligne d'en-tête Fonction ou Procédure ───
+        if (/^\s*(?:Fonction|Procédure)\b/iu.test(lineText)) {
+            const lastColonIdx = textBeforeCursor.lastIndexOf(':');
+            if (lastColonIdx !== -1) {
+                const afterColon = textBeforeCursor.substring(lastColonIdx + 1);
+                if (/^\s*[\p{L}_0-9]*$/u.test(afterColon)) {
+                    return this.getTypeCompletions(analysis, textBeforeCursor);
+                }
+            }
+            return [];
+        }
+
+        // ─── Contexte : ligne d'en-tête Algorithme ───
+        if (/^\s*Algorithme\b/iu.test(lineText)) {
+            return [];
+        }
+
+        // ─── Contexte : déclaration de type composite ───
+        if (/^\s*[\p{L}_][\p{L}0-9_]*\s*=\s*</u.test(lineText)) {
+            const lastColonIdx = textBeforeCursor.lastIndexOf(':');
+            if (lastColonIdx !== -1) {
+                const afterColon = textBeforeCursor.substring(lastColonIdx + 1);
+                if (/^\s*[\p{L}_0-9]*$/u.test(afterColon)) {
+                    return this.getTypeCompletions(analysis, textBeforeCursor);
+                }
+            }
+            return [];
+        }
+
         // ─── Contexte : après ':' ───
-        if (/:\s*$/.test(textBeforeCursor)) {
+        if (/:\s*[\p{L}_0-9]*$/u.test(textBeforeCursor)) {
+            const beforeColonPortion = textBeforeCursor.replace(/:\s*[\p{L}_0-9]*$/u, ':');
             // Après un mot-clé de bloc ("Alors :", "Faire :", "Sinon :", etc.) → AUCUNE complétion
-            if (REGEX_KEYWORD_COLON_CONTEXT.test(textBeforeCursor)) {
+            if (REGEX_KEYWORD_COLON_CONTEXT.test(beforeColonPortion)) {
                 return [];
             }
             // Après une déclaration (variable, paramètre, retour de fonction, champ) → types
-            if (TYPE_DECLARATION_COLON.test(textBeforeCursor)) {
-                return this.getTypeCompletions(analysis);
+            if (TYPE_DECLARATION_COLON.test(beforeColonPortion)) {
+                return this.getTypeCompletions(analysis, textBeforeCursor);
             }
             // Tout autre contexte avec ':' → pas de complétion
             return [];
@@ -598,19 +631,30 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
     }
 
     /**
-     * Complétions de types (après ':' dans une déclaration) — avec espace avant
+     * Complétions de types (après ':' dans une déclaration) — avec espace si nécessaire
      */
-    private getTypeCompletions(analysis: DocumentAnalysis): vscode.CompletionItem[] {
+    private getTypeCompletions(analysis: DocumentAnalysis, textBeforeCursor?: string): vscode.CompletionItem[] {
         const items: vscode.CompletionItem[] = [];
+
+        let prefix = ' ';
+        if (textBeforeCursor) {
+            const lastColonIdx = textBeforeCursor.lastIndexOf(':');
+            if (lastColonIdx !== -1) {
+                const afterColon = textBeforeCursor.substring(lastColonIdx + 1);
+                if (/^\s/.test(afterColon)) {
+                    prefix = '';
+                }
+            }
+        }
 
         for (const type of BUILTIN_TYPES) {
             const item = new vscode.CompletionItem(type.label, vscode.CompletionItemKind.TypeParameter);
             item.detail = type.detail;
             item.sortText = `0_${type.label}`;
             if (type.label === 'tableau') {
-                item.insertText = new vscode.SnippetString(' tableau ${1:entier}[${2:0}..${3:n-1}]');
+                item.insertText = new vscode.SnippetString(`${prefix}tableau \${1:entier}[\${2:0}..\${3:n-1}]`);
             } else {
-                item.insertText = new vscode.SnippetString(` ${type.label}`);
+                item.insertText = new vscode.SnippetString(`${prefix}${type.label}`);
             }
             items.push(item);
         }
@@ -621,7 +665,7 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
             const fieldStr = fields.map(f => `${f.name} : ${f.type}`).join(', ');
             item.detail = `<${fieldStr}>`;
             item.sortText = `1_${typeName}`;
-            item.insertText = new vscode.SnippetString(` ${typeName}`);
+            item.insertText = new vscode.SnippetString(`${prefix}${typeName}`);
             item.documentation = new vscode.MarkdownString(`**Type composite** \`${typeName}\`\n\n\`\`\`psc\n${typeName} = <${fieldStr}>\n\`\`\``);
             items.push(item);
         }
