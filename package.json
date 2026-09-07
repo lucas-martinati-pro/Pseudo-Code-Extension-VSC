@@ -2,7 +2,7 @@
   "name": "pseudocode-interpreter",
   "displayName": "PseudoCode Language Interpreter",
   "description": "Advanced syntax highlighting, intelligent snippets and symbol navigation for the PSC language.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "LucasM54",
   "author": {
     "name": "Lucas Martinati"
@@ -152,6 +152,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "test": "node test-special-chars.js && node test-all-files.js",
     "package": "npx @vscode/vsce package"
   },
   "devDependencies": {

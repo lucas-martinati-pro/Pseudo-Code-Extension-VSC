@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 /**
- * Script de test pour tous les fichiers .psc
- * Teste la transpilation vers Lua et tente l'exécution
+ * Script de test pour les fichiers .psc du repository
+ * Teste la transpilation vers Lua, vérifie la syntaxe Lua et valide l'exécution
  */
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 const { transpileToLua } = require('./out/executor');
 
-// Dossiers à scanner
-const folders = [
-    '/home/lucas_m54/GoogleDrive/Cours/B.U.T Informatique - S1/Algo',
-    '/home/lucas_m54/GoogleDrive/Cours/B.U.T Informatique - S1/Structure de Donnée'
+// Dossiers ou fichiers par défaut (exemples du repository uniquement)
+const defaultFolders = [
+    path.join(__dirname, 'examples')
 ];
+
+// Permettre de passer des dossiers ou fichiers personnalisés en argument CLI si souhaité
+const cliArgs = process.argv.slice(2);
+const targets = cliArgs.length > 0 ? cliArgs : defaultFolders;
 
 // Trouver tous les fichiers .psc récursivement
 function findPscFiles(dir, files = []) {
@@ -66,6 +70,8 @@ const results = {
     transpileFail: 0,
     syntaxCheckSuccess: 0,
     syntaxCheckFail: 0,
+    executionSuccess: 0,
+    executionFail: 0,
     functions: [],
     errors: []
 };
@@ -76,8 +82,18 @@ console.log(`${colors.cyan}═════════════════�
 
 // Trouver tous les fichiers
 const allFiles = [];
-for (const folder of folders) {
-    findPscFiles(folder, allFiles);
+for (const target of targets) {
+    const resolvedTarget = path.resolve(target);
+    if (fs.existsSync(resolvedTarget)) {
+        const stat = fs.statSync(resolvedTarget);
+        if (stat.isDirectory()) {
+            findPscFiles(resolvedTarget, allFiles);
+        } else if (resolvedTarget.endsWith('.psc')) {
+            allFiles.push(resolvedTarget);
+        }
+    } else {
+        console.warn(`${colors.yellow}Avertissement : chemin introuvable : ${target}${colors.reset}`);
+    }
 }
 
 console.log(`${colors.blue}Fichiers trouvés: ${allFiles.length}${colors.reset}\n`);
@@ -85,7 +101,7 @@ console.log(`${colors.blue}Fichiers trouvés: ${allFiles.length}${colors.reset}\
 // Tester chaque fichier
 for (const file of allFiles) {
     results.total++;
-    const relativePath = file.replace('/home/lucas_m54/GoogleDrive/Cours/B.U.T Informatique - S1/', '');
+    const relativePath = path.relative(__dirname, file);
     
     console.log(`${colors.blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
     console.log(`${colors.yellow}📄 ${relativePath}${colors.reset}`);
@@ -107,13 +123,15 @@ for (const file of allFiles) {
             console.log(`   ${colors.green}✓ Transpilation réussie${colors.reset}`);
             
             // Sauvegarder le code Lua temporairement
-            const tempLuaFile = `/tmp/psc_test_${Date.now()}.lua`;
-            fs.writeFileSync(tempLuaFile, luaCode);
+            const tempLuaFile = path.join(os.tmpdir(), `psc_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.lua`);
+            fs.writeFileSync(tempLuaFile, luaCode, 'utf8');
             
             // Vérifier la syntaxe Lua
+            let syntaxOk = false;
             try {
                 execSync(`luac -p "${tempLuaFile}"`, { stdio: 'pipe' });
                 results.syntaxCheckSuccess++;
+                syntaxOk = true;
                 console.log(`   ${colors.green}✓ Syntaxe Lua valide${colors.reset}`);
             } catch (luaError) {
                 results.syntaxCheckFail++;
@@ -135,8 +153,23 @@ for (const file of allFiles) {
                 }
             }
             
+            // Si la syntaxe est valide, tester l'exécution
+            if (syntaxOk) {
+                try {
+                    execSync(`lua "${tempLuaFile}"`, { stdio: 'pipe' });
+                    results.executionSuccess++;
+                    console.log(`   ${colors.green}✓ Exécution Lua réussie${colors.reset}`);
+                } catch (execError) {
+                    results.executionFail++;
+                    const execMsg = execError.stderr ? execError.stderr.toString() : execError.message;
+                    console.log(`   ${colors.yellow}⚠ Exécution terminée avec erreur : ${execMsg.trim()}${colors.reset}`);
+                }
+            }
+            
             // Nettoyer
-            fs.unlinkSync(tempLuaFile);
+            if (fs.existsSync(tempLuaFile)) {
+                fs.unlinkSync(tempLuaFile);
+            }
             
         } catch (transpileError) {
             results.transpileFail++;
@@ -164,7 +197,8 @@ console.log(`${colors.cyan}    RÉSUMÉ${colors.reset}`);
 console.log(`${colors.cyan}═══════════════════════════════════════════════════════════════${colors.reset}`);
 console.log(`\nFichiers testés: ${results.total}`);
 console.log(`${colors.green}Transpilation réussie: ${results.transpileSuccess}/${results.total}${colors.reset}`);
-console.log(`${colors.green}Syntaxe Lua valide: ${results.syntaxCheckSuccess}/${results.transpileSuccess}${colors.reset}`);
+console.log(`${colors.green}Syntaxe Lua valide: ${results.syntaxCheckSuccess}/${results.total}${colors.reset}`);
+console.log(`${colors.green}Exécution Lua réussie: ${results.executionSuccess}/${results.total}${colors.reset}`);
 
 if (results.errors.length > 0) {
     console.log(`\n${colors.red}Erreurs (${results.errors.length}):${colors.reset}`);
@@ -191,6 +225,10 @@ for (const entry of results.functions) {
 console.log(`\n${colors.blue}Total fonctions: ${totalFunctions}${colors.reset}`);
 
 // Écrire le rapport JSON
-const reportPath = '/tmp/psc_test_report.json';
+const reportPath = path.join(os.tmpdir(), 'psc_test_report.json');
 fs.writeFileSync(reportPath, JSON.stringify(results, null, 2));
-console.log(`\n${colors.blue}Rapport détaillé: ${reportPath}${colors.reset}`);
+console.log(`\n${colors.blue}Rapport détaillé: ${reportPath}${colors.reset}\n`);
+
+if (results.errors.length > 0) {
+    process.exit(1);
+}

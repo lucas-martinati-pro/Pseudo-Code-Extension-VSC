@@ -375,7 +375,102 @@ Début
 	écrire("Tableau après QuickSort : ", tabATrier)
 	écrire("")
 
+	// ─────────────────────────────────────────────────────────────────────────
+	// 13. FONCTIONS & IDENTIFICATEURS AVEC CARACTÈRES ACCENTUÉS
+	// ─────────────────────────────────────────────────────────────────────────
+	écrire("=== 13. FONCTIONS & IDENTIFICATEURS AVEC CARACTÈRES ACCENTUÉS ===")
+
+	// 13.1 Fonctions d'analyse syntaxique (cas concret BUT S3 : aritéSymbole, lireSymbole, getExpression)
+	Fonction lireSymbole() : chaîne
+	Début
+		retourner "+"
+	Fin
+
+	Fonction aritéSymbole(symbole : chaîne) : entier
+	Début
+		Si (symbole = "+" ou symbole = "-" ou symbole = "*" ou symbole = "/") Alors :
+			retourner 2
+		Sinon Si (symbole = "non" ou symbole = "-unaire") Alors :
+			retourner 1
+		Sinon :
+			retourner 0
+		fsi
+	Fin
+
+	// 13.2 Homonyme sans accent pour valider la distinction stricte (é vs e)
+	Fonction ariteSymbole(symbole : chaîne) : entier
+	Début
+		retourner 99
+	Fin
+
+	Fonction getExpression(noExpression : entier) : chaîne
+	Début
+		retourner concat("expr_", noExpression)
+	Fin
+
+	// 13.3 Fonction avec paramètres accentués et variable locale accentuée
+	Fonction évaluerOpération(opérateur : chaîne, opérandeGauche : réel, opérandeDroite : réel) : réel
+	Début
+		résultat ← 0.0
+		Si (opérateur = "+") Alors :
+			résultat ← opérandeGauche + opérandeDroite
+		Sinon Si (opérateur = "*") Alors :
+			résultat ← opérandeGauche * opérandeDroite
+		Sinon Si (opérateur = "-") Alors :
+			résultat ← opérandeGauche - opérandeDroite
+		fsi
+		retourner résultat
+	Fin
+
+	// 13.4 Récursivité avec nom de fonction et paramètre accentués
+	Fonction calculerÉlémentRécursif(décompte : entier) : entier
+	Début
+		Si (décompte ≤ 1) Alors :
+			retourner 1
+		Sinon :
+			retourner décompte * calculerÉlémentRécursif(décompte - 1)
+		fsi
+	Fin
+
+	// 13.5 Procédure InOut avec paramètres accentués
+	Fonction incrémenterValeurSpéciale(valeurCible InOut : entier, incrémentDonné : entier)
+	Début
+		valeurCible ← valeurCible + incrémentDonné
+	Fin
+
+	// 13.6 Multiples accents variés (à, è, é)
+	Fonction vérifierÀNouveau(premièreEntrée : entier) : booléen
+	Début
+		retourner premièreEntrée > 0
+	Fin
+
+	// Exécution des tests d'accents
+	symbLu ← lireSymbole()
+	aritéAvecAcc ← aritéSymbole(symbLu)
+	aritéSansAcc ← ariteSymbole(symbLu)
+	exprTest ← getExpression(42)
+
+	écrire("Symbole lu : ", symbLu)
+	écrire("aritéSymbole('", symbLu, "') avec accent : ", aritéAvecAcc)
+	écrire("ariteSymbole('", symbLu, "') sans accent (distinction é/e) : ", aritéSansAcc)
+	écrire("getExpression(42) : ", exprTest)
+
+	valCalculée ← évaluerOpération("+", 12.5, 7.5)
+	écrire("évaluerOpération('+', 12.5, 7.5) : ", valCalculée)
+
+	recVal ← calculerÉlémentRécursif(5)
+	écrire("calculerÉlémentRécursif(5) : ", recVal)
+
+	compteurAccentué ← 50
+	incrémenterValeurSpéciale(compteurAccentué, 15)
+	écrire("Compteur après incrémenterValeurSpéciale : ", compteurAccentué)
+
+	estValide ← vérifierÀNouveau(compteurAccentué)
+	écrire("vérifierÀNouveau(compteurAccentué) : ", estValide)
+	écrire("")
+
 	écrire("╔════════════════════════════════════════════════════════════════╗")
 	écrire("║      🎉 TOUS LES TESTS SE SONT EXÉCUTÉS AVEC SUCCÈS !          ║")
 	écrire("╚════════════════════════════════════════════════════════════════╝")
 Fin
+

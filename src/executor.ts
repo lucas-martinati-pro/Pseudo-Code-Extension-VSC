@@ -5,7 +5,7 @@
 import { PATTERNS, LUA_HELPERS } from './constants';
 import { PSC_DEFINITIONS } from './definitions';
 import { REGEX_ALL_CLOSING } from './blocks';
-import { smartSplitArgs, findMatchingParen, protectStrings, restoreStrings, parseCompositeFields } from './utils';
+import { smartSplitArgs, findMatchingParen, protectStrings, restoreStrings, parseCompositeFields, encodeIdentifier, encodeSpecialIdentifiers } from './utils';
 import { FunctionRegistry } from './functionRegistry';
 import { CompositeTypeRegistry } from './compositeTypes';
 
@@ -371,9 +371,9 @@ export function transpileToLua(pscCode: string): string {
             const fieldsStr = compositeMatch[2];
             const fields = parseCompositeFields(fieldsStr).map(f => f.name);
             
-            const params = fields.join(', ');
-            const tableFields = fields.map(f => `${f} = ${f}`).join(', ');
-            luaCode += `function ${typeName}(${params})\n\treturn { _type = '${typeName}', ${tableFields} }\nend\n`;
+            const params = fields.map(encodeIdentifier).join(', ');
+            const tableFields = fields.map(f => `${encodeIdentifier(f)} = ${encodeIdentifier(f)}`).join(', ');
+            luaCode += `function ${encodeIdentifier(typeName)}(${params})\n\treturn { _type = '${typeName}', ${tableFields} }\nend\n`;
             continue;
         }
 
@@ -381,6 +381,7 @@ export function transpileToLua(pscCode: string): string {
         const arrayDecl = REGEX_ARRAY_DECL.exec(trimmedLine);
         if (arrayDecl) {
             const varName = arrayDecl[1];
+            const safeVarName = encodeIdentifier(varName);
             const dimsStr = arrayDecl[2];
             const dims = smartSplitArgs(dimsStr);
             const ranges = dims.map(d => {
@@ -399,11 +400,11 @@ export function transpileToLua(pscCode: string): string {
             }
 
             const indentation = originalLineForIndentation.match(REGEX_INDENTATION)?.[0] || '';
-            let block = `${indentation}${varName} = {}` + '\n';
+            let block = `${indentation}${safeVarName} = {}` + '\n';
 
             // Créer des boucles pour dimensions-1 pour instancier les sous-tables
             if (ranges.length >= 2) {
-                let path = varName;
+                let path = safeVarName;
                 let innerIndent = indentation;
                 for (let idx = 0; idx < ranges.length - 1; idx++) {
                     const it = `__i${idx + 1}`;
@@ -446,7 +447,7 @@ export function transpileToLua(pscCode: string): string {
                     const lastLine = luaCode.trim().split('\n').pop() || '';
                     if (!REGEX_RETURN_LINE.test(lastLine)) {
                         const indentation = originalLineForIndentation.match(REGEX_INDENTATION)?.[0] || '';
-                        luaCode += `${indentation}\treturn ${funcInfo.inOutParamNames.join(', ')}\n`;
+                        luaCode += `${indentation}\treturn ${funcInfo.inOutParamNames.map(encodeIdentifier).join(', ')}\n`;
                     }
                 }
                 trimmedLine = 'end';
@@ -478,18 +479,21 @@ export function transpileToLua(pscCode: string): string {
                 .replace(/\bfichier\s+fin\b/giu, 'fichierfin')
                 .replace(/\bfichier\s+cr[eé]er\b/giu, 'fichiercreer')
                 .replace(/\bfichier\s+[eé]crire\b/giu, 'fichierecrire')
-                .replace(/\bcha[iî]ne\s+vers\s+entier\b/giu, 'chaineversentier');
+                .replace(/\bcha[iî]ne\s+vers\s+entier\b/giu, 'chaineversentier')
+                .replace(/\bd[eé]piler\b/giu, 'depiler')
+                .replace(/\bd[eé]filer\b/giu, 'defiler');
 
             if (REGEX_FONCTION.test(trimmedLine)) {
                 const funcNameMatch = REGEX_FONCTION_NAME.exec(trimmedLine);
                 if (funcNameMatch && functionRegistry.has(funcNameMatch[1])) {
                     const funcInfo = functionRegistry.get(funcNameMatch[1])!;
                     functionStack.push(funcInfo);
-                    const paramNames = funcInfo.params.map(p => p.name).join(', ');
+                    const paramNames = funcInfo.params.map(p => encodeIdentifier(p.name)).join(', ');
                     const indentation = originalLineForIndentation.match(REGEX_INDENTATION)?.[0] || '';
-                    let funcHeader = `function ${funcInfo.name}(${paramNames})`;
+                    let funcHeader = `function ${encodeIdentifier(funcInfo.name)}(${paramNames})`;
                     if (funcInfo.localVars && funcInfo.localVars.length > 0) {
-                        funcHeader += `\n${indentation}\tlocal ${funcInfo.localVars.join(', ')}`;
+                        const localVarsStr = funcInfo.localVars.map(v => encodeIdentifier(v)).join(', ');
+                        funcHeader += `\n${indentation}\tlocal ${localVarsStr}`;
                     }
                     trimmedLine = funcHeader;
                     lineIsFullyProcessed = true;
@@ -514,12 +518,13 @@ export function transpileToLua(pscCode: string): string {
 
                             if (varsToReassign.length > 0) {
                                 const callExpression = trimmedLine.slice(match.index, closeIdx + 1);
+                                const safeVarsToReassign = varsToReassign.map(encodeIdentifier);
                                 if (trimmedLine.includes('←')) {
                                     const parts = trimmedLine.split('←');
                                     const lhs = parts[0].trim();
-                                    trimmedLine = `${lhs}, ${varsToReassign.join(', ')} = ${parts[1].trim()}`;
+                                    trimmedLine = `${lhs}, ${safeVarsToReassign.join(', ')} = ${parts[1].trim()}`;
                                 } else {
-                                    trimmedLine = `${varsToReassign.join(', ')} = ${callExpression}`;
+                                    trimmedLine = `${safeVarsToReassign.join(', ')} = ${callExpression}`;
                                 }
                                 lineIsFullyProcessed = true;
                                 break;
@@ -753,7 +758,7 @@ export function transpileToLua(pscCode: string): string {
                 const currentFunc = functionStack.length > 0 ? functionStack[functionStack.length - 1] : null;
                 let inOutSuffix = '';
                 if (currentFunc && currentFunc.inOutParamNames.length > 0) {
-                    inOutSuffix = ', ' + currentFunc.inOutParamNames.join(', ');
+                    inOutSuffix = ', ' + currentFunc.inOutParamNames.map(encodeIdentifier).join(', ');
                 }
 
                 if (REGEX_RETOURNER_PAREN.test(trimmedLine)) {
@@ -921,6 +926,9 @@ export function transpileToLua(pscCode: string): string {
         if (/^\s*[eé]crire\s+[^(]/iu.test(trimmedLine)) {
             trimmedLine = trimmedLine.replace(/^\s*[eé]crire\s+(.+)$/iu, '__psc_write($1)');
         }
+
+        // Encoder les identifiants spéciaux (fonctions, variables, paramètres avec accents) pour Lua
+        trimmedLine = encodeSpecialIdentifiers(trimmedLine);
 
         // Restaurer les chaînes littérales protégées
         trimmedLine = restoreStrings(trimmedLine, lineStrings);

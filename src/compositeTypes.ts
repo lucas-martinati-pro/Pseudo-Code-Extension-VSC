@@ -3,7 +3,7 @@
  */
 
 import { PATTERNS } from './constants';
-import { smartSplitArgs, findMatchingParen, parseCompositeFields } from './utils';
+import { smartSplitArgs, findMatchingParen, parseCompositeFields, encodeIdentifier } from './utils';
 
 export interface CompositeField {
     name: string;
@@ -83,7 +83,7 @@ export class CompositeTypeRegistry {
 
             for (const compositeType of this.types.values()) {
                 const typeName = compositeType.name;
-                const regex = new RegExp(`\\b${typeName}\\s*\\(`, 'gi');
+                const regex = new RegExp(`(?<![\\p{L}0-9_])${typeName}\\s*\\(`, 'giu');
                 let match: RegExpExecArray | null;
 
                 while ((match = regex.exec(result)) !== null) {
@@ -97,7 +97,7 @@ export class CompositeTypeRegistry {
 
                         const fieldAssignments = compositeType.fields.map((field, index) => {
                             const value = args[index] || 'nil';
-                            return `${field.name} = ${value}`;
+                            return `${encodeIdentifier(field.name)} = ${value}`;
                         });
 
                         const replacement = `__PSC_TABLE_START____psc_create_composite({${fieldAssignments.join(', ')}})__PSC_TABLE_END__`;
@@ -134,7 +134,7 @@ export class CompositeTypeRegistry {
                     // Table avec champs nommés
                     const fieldAssignments = matchingType.fields.map((field, index) => {
                         const value = args[index] || 'nil';
-                        return `${field.name} = ${value}`;
+                        return `${encodeIdentifier(field.name)} = ${value}`;
                     });
                     return `__PSC_TABLE_START____psc_create_composite({${fieldAssignments.join(', ')}})__PSC_TABLE_END__`;
                 }

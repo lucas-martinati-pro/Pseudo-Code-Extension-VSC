@@ -360,3 +360,84 @@ export function extractFunctionParams(paramsString: string): FunctionParamInfo[]
     return params;
 }
 
+/**
+ * Map des caractères accentués / spéciaux courants vers des représentations textuelles sécurisées en Lua.
+ */
+export const SPECIAL_CHAR_MAP: Record<string, string> = {
+    'é': '_eacute_',
+    'è': '_egrave_',
+    'ê': '_ecirc_',
+    'ë': '_euml_',
+    'à': '_agrave_',
+    'â': '_acirc_',
+    'ä': '_auml_',
+    'î': '_icirc_',
+    'ï': '_iuml_',
+    'ô': '_ocirc_',
+    'ö': '_ouml_',
+    'ù': '_ugrave_',
+    'û': '_ucirc_',
+    'ü': '_uuml_',
+    'ç': '_ccedil_',
+    'œ': '_oe_',
+    'æ': '_ae_',
+    'É': '_Eacute_',
+    'È': '_Egrave_',
+    'Ê': '_Ecirc_',
+    'Ë': '_Euml_',
+    'À': '_Agrave_',
+    'Â': '_Acirc_',
+    'Ä': '_Auml_',
+    'Î': '_Icirc_',
+    'Ï': '_Iuml_',
+    'Ô': '_Ocirc_',
+    'Ö': '_Ouml_',
+    'Ù': '_Ugrave_',
+    'Û': '_Ucirc_',
+    'Ü': '_Uuml_',
+    'Ç': '_Ccedil_',
+    'Œ': '_OE_',
+    'Æ': '_AE_',
+};
+
+/**
+ * Encode un identifiant contenant des caractères non-ASCII / spéciaux pour le rendre valide en Lua,
+ * tout en distinguant les caractères accentués (ex: 'é' vs 'e').
+ */
+export function encodeIdentifier(name: string): string {
+    if (!name || /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) {
+        return name;
+    }
+    let encoded = '';
+    for (const char of name) {
+        if (/[a-zA-Z0-9_]/.test(char)) {
+            encoded += char;
+        } else if (SPECIAL_CHAR_MAP[char]) {
+            encoded += SPECIAL_CHAR_MAP[char];
+        } else {
+            const cp = char.codePointAt(0);
+            encoded += `_u${cp ? cp.toString(16) : '0'}_`;
+        }
+    }
+    if (/^[0-9]/.test(encoded)) {
+        encoded = '_' + encoded;
+    }
+    return encoded;
+}
+
+const REGEX_SPECIAL_IDENTIFIERS = /(?<![\p{L}0-9_])[\p{L}_][\p{L}0-9_]*(?![\p{L}0-9_])/gu;
+
+/**
+ * Remplace tous les identifiants contenant des caractères non-ASCII / spéciaux dans une chaîne
+ * par leur version encodée pour Lua.
+ */
+export function encodeSpecialIdentifiers(text: string): string {
+    REGEX_SPECIAL_IDENTIFIERS.lastIndex = 0;
+    return text.replace(REGEX_SPECIAL_IDENTIFIERS, (match) => {
+        if (/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(match)) {
+            return match;
+        }
+        return encodeIdentifier(match);
+    });
+}
+
