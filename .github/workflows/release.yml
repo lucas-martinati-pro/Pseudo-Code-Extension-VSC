@@ -54,7 +54,7 @@ jobs:
         run: |
           node -e "
             const fs = require('fs');
-            const releaseFile = ['RELEASE_NOTES.md', 'release_notes.md', 'RELEASENOTES.md'].find(f => fs.existsSync(f));
+            const releaseFile = ['RELEASE_NOTES.md'].find(f => fs.existsSync(f));
             if (releaseFile) {
               const content = fs.readFileSync(releaseFile, 'utf8');
               const tagName = process.env.TAG_NAME || '';
