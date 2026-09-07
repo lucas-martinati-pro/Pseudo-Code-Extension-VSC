@@ -7,11 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag de version (ex: v0.3.0) - optionnel si vide, prend la version du package.json'
-        required: false
-        type: string
-      description:
-        description: 'Description personnalisée de la release (supporte le Markdown et les retours à la ligne)'
+        description: 'Tag de version (ex: v0.4.2) - optionnel si vide, prend la version du package.json'
         required: false
         type: string
       draft:
@@ -55,19 +51,28 @@ jobs:
           fi
 
       - name: Prepare Release Notes
-        env:
-          INPUT_DESC: ${{ github.event.inputs.description }}
         run: |
-          if [ -n "$INPUT_DESC" ]; then
-            # Préserve les retours à la ligne réels et convertit les \n textuels
-            printf "%b\n" "$INPUT_DESC" > release_notes.md
-            echo "HAS_BODY=true" >> $GITHUB_ENV
-          elif [ -f "RELEASE_NOTES.md" ]; then
-            cp RELEASE_NOTES.md release_notes.md
-            echo "HAS_BODY=true" >> $GITHUB_ENV
-          else
-            echo "HAS_BODY=false" >> $GITHUB_ENV
-          fi
+          node -e "
+            const fs = require('fs');
+            const releaseFile = ['RELEASE_NOTES.md', 'release_notes.md', 'RELEASENOTES.md'].find(f => fs.existsSync(f));
+            if (releaseFile) {
+              const content = fs.readFileSync(releaseFile, 'utf8');
+              const tagName = process.env.TAG_NAME || '';
+              const version = tagName.replace(/^v/, '');
+              const sections = content.split(/\n(?=# 🚀 Release)/);
+              let matched = null;
+              if (version) {
+                matched = sections.find(s => s.includes(version));
+              }
+              const note = (matched || sections[0] || content).trim();
+              fs.writeFileSync('release_notes.md', note, 'utf8');
+              console.log('Notes de version extraites depuis ' + releaseFile + ' pour ' + (tagName || 'la version la plus récente'));
+              fs.appendFileSync(process.env.GITHUB_ENV, 'HAS_BODY=true\n');
+            } else {
+              console.log('Aucun fichier RELEASE_NOTES.md trouvé.');
+              fs.appendFileSync(process.env.GITHUB_ENV, 'HAS_BODY=false\n');
+            }
+          "
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
