@@ -147,9 +147,19 @@ if (repository['variables']) {
     repository['variables'].match = `(?i)\\b(?!(?:${excludedPattern})\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b`;
 }
 
-// 9. Mettre à jour la boucle for pour supporter Unicode
+// 9. Mettre à jour la boucle for pour supporter Unicode et Pour chaque ... dans ...
 if (repository['for-loop']) {
-    repository['for-loop'].begin = `(?i)\\b(Pour)\\s+(${IDENT_START}${IDENT_CHAR}*)\\s+(de|allant\\s+de)\\b`;
+    repository['for-loop'].begin = `(?i)\\b(Pour)\\s+(?:(chaque)\\s+)?(${IDENT_START}${IDENT_CHAR}*)\\s+(de|allant\\s+de|dans)\\b`;
+    repository['for-loop'].beginCaptures = {
+        "1": { "name": "keyword.control" },
+        "2": { "name": "keyword.control" },
+        "3": { "name": "variable.other" },
+        "4": { "name": "keyword.control" }
+    };
+    repository['for-loop'].end = `(?i)\\b(Faire)\\b|$`;
+    repository['for-loop'].endCaptures = {
+        "1": { "name": "keyword.control" }
+    };
 }
 
 // 10. Mettre à jour la détection de type après deux-points pour supporter Unicode

@@ -54,83 +54,30 @@ interface TypeMethod {
     description: string;
 }
 
-/** Méthodes associées à chaque type intégré (appelées fonctionnellement avec le type en 1er arg) */
-const TYPE_METHODS: Record<string, TypeMethod[]> = {
-    'liste': [
-        { name: 'tete', signature: 'tete(l) : place', snippet: 'tete(${VAR})', description: 'Retourne la place de tête de la liste' },
-        { name: 'val', signature: 'val(l, p) : élément', snippet: 'val(${VAR}, ${1:p})', description: 'Retourne la valeur à la place p' },
-        { name: 'suc', signature: 'suc(l, p) : place', snippet: 'suc(${VAR}, ${1:p})', description: 'Retourne la place suivante' },
-        { name: 'finListe', signature: 'finListe(l, p) : booléen', snippet: 'finListe(${VAR}, ${1:p})', description: 'Vrai si p est en fin de liste' },
-        { name: 'listeVide', signature: 'listeVide() : Liste', snippet: 'listeVide()', description: 'Crée une liste vide' },
-        { name: 'ajoutTeteListe', signature: 'ajoutTeteListe(l, v) : Liste', snippet: 'ajoutTeteListe(${VAR}, ${1:v})', description: 'Ajoute en tête de liste' },
-        { name: 'suppressionTeteListe', signature: 'suppressionTeteListe(l) : Liste', snippet: 'suppressionTeteListe(${VAR})', description: 'Supprime la tête' },
-        { name: 'ajoutQueueListe', signature: 'ajoutQueueListe(l, v) : Liste', snippet: 'ajoutQueueListe(${VAR}, ${1:v})', description: 'Ajoute en queue de liste' },
-        { name: 'suppressionQueueListe', signature: 'suppressionQueueListe(l) : Liste', snippet: 'suppressionQueueListe(${VAR})', description: 'Supprime la queue' },
-        { name: 'ajoutListe', signature: 'ajoutListe(l, p, v) : Liste', snippet: 'ajoutListe(${VAR}, ${1:p}, ${2:v})', description: 'Ajoute à la place p' },
-        { name: 'suppressionListe', signature: 'suppressionListe(l, p) : Liste', snippet: 'suppressionListe(${VAR}, ${1:p})', description: 'Supprime à la place p' },
-        { name: 'changeListe', signature: 'changeListe(l, p, v) : Liste', snippet: 'changeListe(${VAR}, ${1:p}, ${2:v})', description: 'Change la valeur à la place p' }
-    ],
-    'listesym': [
-        { name: 'teteLS', signature: 'teteLS(l) : place', snippet: 'teteLS(${VAR})', description: 'Place de tête de la liste symétrique' },
-        { name: 'queueLS', signature: 'queueLS(l) : place', snippet: 'queueLS(${VAR})', description: 'Place de queue' },
-        { name: 'valLS', signature: 'valLS(l, p) : élément', snippet: 'valLS(${VAR}, ${1:p})', description: 'Valeur à la place p' },
-        { name: 'sucLS', signature: 'sucLS(l, p) : place', snippet: 'sucLS(${VAR}, ${1:p})', description: 'Place suivante' },
-        { name: 'precLS', signature: 'precLS(l, p) : place', snippet: 'precLS(${VAR}, ${1:p})', description: 'Place précédente' },
-        { name: 'finLS', signature: 'finLS(l, p) : booléen', snippet: 'finLS(${VAR}, ${1:p})', description: 'Fin de liste symétrique' },
-        { name: 'videLS', signature: 'videLS() : ListeSym', snippet: 'videLS()', description: 'Crée une liste symétrique vide' },
-        { name: 'ajoutTeteLS', signature: 'ajoutTeteLS(l, v)', snippet: 'ajoutTeteLS(${VAR}, ${1:v})', description: 'Ajoute en tête' },
-        { name: 'suppressionTeteLS', signature: 'suppressionTeteLS(l)', snippet: 'suppressionTeteLS(${VAR})', description: 'Supprime la tête' },
-        { name: 'ajoutQueueLS', signature: 'ajoutQueueLS(l, v)', snippet: 'ajoutQueueLS(${VAR}, ${1:v})', description: 'Ajoute en queue' },
-        { name: 'suppressionQueueLS', signature: 'suppressionQueueLS(l)', snippet: 'suppressionQueueLS(${VAR})', description: 'Supprime la queue' },
-        { name: 'ajoutLS', signature: 'ajoutLS(l, p, v)', snippet: 'ajoutLS(${VAR}, ${1:p}, ${2:v})', description: 'Ajoute à une place' },
-        { name: 'suppressionLS', signature: 'suppressionLS(l, p)', snippet: 'suppressionLS(${VAR}, ${1:p})', description: 'Supprime à une place' },
-        { name: 'changeLS', signature: 'changeLS(l, p, v)', snippet: 'changeLS(${VAR}, ${1:p}, ${2:v})', description: 'Change la valeur' }
-    ],
-    'pile': [
-        { name: 'pileVide', signature: 'pileVide() : Pile', snippet: 'pileVide()', description: 'Crée une pile vide' },
-        { name: 'sommet', signature: 'sommet(p) : élément', snippet: 'sommet(${VAR})', description: 'Élément au sommet de la pile' },
-        { name: 'estVidePile', signature: 'estVidePile(p) : booléen', snippet: 'estVidePile(${VAR})', description: 'Vrai si la pile est vide' },
-        { name: 'empiler', signature: 'empiler(p, v)', snippet: 'empiler(${VAR}, ${1:v})', description: 'Empile un élément' },
-        { name: 'dépiler', signature: 'dépiler(p)', snippet: 'depiler(${VAR})', description: 'Dépile le sommet' }
-    ],
-    'file': [
-        { name: 'fileVide', signature: 'fileVide() : File', snippet: 'fileVide()', description: 'Crée une file vide' },
-        { name: 'estVideFile', signature: 'estVideFile(f) : booléen', snippet: 'estVideFile(${VAR})', description: 'Vrai si la file est vide' },
-        { name: 'enfiler', signature: 'enfiler(f, v)', snippet: 'enfiler(${VAR}, ${1:v})', description: 'Enfile un élément' },
-        { name: 'défiler', signature: 'défiler(f)', snippet: 'defiler(${VAR})', description: 'Défile le premier élément' },
-        { name: 'premier', signature: 'premier(f) : élément', snippet: 'premier(${VAR})', description: 'Premier élément de la file' }
-    ],
-    'table': [
-        { name: 'tableVide', signature: 'tableVide() : Table', snippet: 'tableVide()', description: 'Crée une table vide' },
-        { name: 'domaine', signature: 'domaine(t) : ensemble', snippet: 'domaine(${VAR})', description: 'Ensemble des clés' },
-        { name: 'accesTable', signature: 'accesTable(t, clé) : valeur', snippet: 'accesTable(${VAR}, ${1:clé})', description: 'Accède à une valeur par clé' },
-        { name: 'ajoutTable', signature: 'ajoutTable(t, clé, val)', snippet: 'ajoutTable(${VAR}, ${1:clé}, ${2:valeur})', description: 'Ajoute une entrée' },
-        { name: 'suppressionTable', signature: 'suppressionTable(t, clé)', snippet: 'suppressionTable(${VAR}, ${1:clé})', description: 'Supprime une entrée' },
-        { name: 'changeTable', signature: 'changeTable(t, clé, val)', snippet: 'changeTable(${VAR}, ${1:clé}, ${2:valeur})', description: 'Change la valeur d\'une clé' },
-        { name: 'estDans', signature: 'estDans(ensemble, élément) : booléen', snippet: 'estDans(${VAR}, ${1:élément})', description: 'Vérifie si un élément est dans l\'ensemble' }
-    ],
-    'chaîne': [
-        { name: 'longueur', signature: 'longueur(s) : entier', snippet: 'longueur(${VAR})', description: 'Longueur de la chaîne' },
-        { name: 'concat', signature: 'concat(s1, s2) : chaîne', snippet: 'concat(${VAR}, ${1:s2})', description: 'Concaténation de deux chaînes' },
-        { name: 'souschaîne', signature: 'souschaîne(s, début, fin) : chaîne', snippet: 'souschaîne(${VAR}, ${1:début}, ${2:fin})', description: 'Extrait une sous-chaîne' },
-        { name: 'ième', signature: 'ième(s, i) : caractère', snippet: 'ième(${VAR}, ${1:i})', description: 'Caractère à la position i' }
-    ],
-    'chaine': [
-        { name: 'longueur', signature: 'longueur(s) : entier', snippet: 'longueur(${VAR})', description: 'Longueur de la chaîne' },
-        { name: 'concat', signature: 'concat(s1, s2) : chaîne', snippet: 'concat(${VAR}, ${1:s2})', description: 'Concaténation de deux chaînes' },
-        { name: 'souschaîne', signature: 'souschaîne(s, début, fin) : chaîne', snippet: 'souschaîne(${VAR}, ${1:début}, ${2:fin})', description: 'Extrait une sous-chaîne' },
-        { name: 'ième', signature: 'ième(s, i) : caractère', snippet: 'ième(${VAR}, ${1:i})', description: 'Caractère à la position i' }
-    ],
-    'tableau': [
-        { name: 'longueur', signature: 'longueur(tab) : entier', snippet: 'longueur(${VAR})', description: 'Taille du tableau' }
-    ],
-    'fichier': [
-        { name: 'fichierLire', signature: 'fichierLire(handle) : chaîne', snippet: 'fichierLire(${VAR})', description: 'Lit une ligne du fichier' },
-        { name: 'fichierEcrire', signature: 'fichierEcrire(handle, valeur)', snippet: 'fichierEcrire(${VAR}, ${1:valeur})', description: 'Écrit dans le fichier' },
-        { name: 'fichierFin', signature: 'fichierFin(handle) : booléen', snippet: 'fichierFin(${VAR})', description: 'Vrai si fin de fichier atteinte' },
-        { name: 'fichierFermer', signature: 'fichierFermer(handle)', snippet: 'fichierFermer(${VAR})', description: 'Ferme le fichier' }
-    ]
-};
+/** Méthodes associées à chaque type intégré (dérivées automatiquement de PSC_DEFINITIONS) */
+function buildTypeMethods(): Record<string, TypeMethod[]> {
+    const map: Record<string, TypeMethod[]> = {};
+    for (const f of PSC_DEFINITIONS.functions) {
+        if (!f.targetType) continue;
+        const displayName = f.signature ? f.signature.split('(')[0].trim() : f.name;
+        const targets = Array.isArray(f.targetType) ? f.targetType : [f.targetType];
+        for (const target of targets) {
+            const key = target.toLowerCase();
+            if (!map[key]) {
+                map[key] = [];
+            }
+            map[key].push({
+                name: displayName,
+                signature: f.signature || `${displayName}(...)`,
+                snippet: f.methodSnippet || f.snippet || `${displayName}($1)`,
+                description: f.description || ''
+            });
+        }
+    }
+    return map;
+}
+
+const TYPE_METHODS: Record<string, TypeMethod[]> = buildTypeMethods();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SIGNATURES DES FONCTIONS INTÉGRÉES
@@ -157,22 +104,13 @@ function buildBuiltinFunctions(): BuiltinFunctionInfo[] {
 const BUILTIN_FUNCTIONS = buildBuiltinFunctions();
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TYPES DISPONIBLES
+// TYPES DISPONIBLES (dérivés automatiquement de PSC_DEFINITIONS.types)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const BUILTIN_TYPES: Array<{ label: string; detail: string }> = [
-    { label: 'entier', detail: 'Nombre entier' },
-    { label: 'réel', detail: 'Nombre réel (décimal)' },
-    { label: 'booléen', detail: 'Valeur logique (vrai/faux)' },
-    { label: 'chaîne', detail: 'Chaîne de caractères' },
-    { label: 'caractère', detail: 'Un seul caractère' },
-    { label: 'tableau', detail: 'Tableau indexé' },
-    { label: 'liste', detail: 'Liste chaînée (TDA)' },
-    { label: 'pile', detail: 'Pile LIFO (TDA)' },
-    { label: 'file', detail: 'File FIFO (TDA)' },
-    { label: 'listesym', detail: 'Liste symétrique (TDA)' },
-    { label: 'table', detail: 'Table associative clé→valeur (TDA)' }
-];
+const BUILTIN_TYPES: Array<{ label: string; detail: string }> = PSC_DEFINITIONS.types.map(t => ({
+    label: t.name,
+    detail: t.description || t.name
+}));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ANALYSE DU DOCUMENT
@@ -190,18 +128,22 @@ interface DocumentAnalysis {
 }
 
 /**
- * Résout le type de base d'une déclaration de type.
- * Ex: "tableau entier[0..n]" → "tableau", "Liste(Etudiant)" → "liste", "chaîne" → "chaîne"
+ * Résout le type de base d'une déclaration de type de manière générique.
+ * Ex: "tableau entier[0..n]" → "tableau", "Liste(Etudiant)" → "liste", "ensemble" → "ensemble", "chaîne" → "chaîne"
  */
 function resolveBaseType(rawType: string): string {
-    const t = rawType.trim().toLowerCase();
-    // "tableau ..." → "tableau"
-    if (/^\s*tableau\b/i.test(rawType)) return 'tableau';
-    // "fichier ..." → "fichier"
-    if (/^\s*fichier\b/i.test(rawType)) return 'fichier';
-    // "Liste(...)" → "liste"
-    const parenIdx = t.indexOf('(');
-    const base = parenIdx !== -1 ? t.substring(0, parenIdx).trim() : t;
+    const trimmed = rawType.trim();
+    // 1. Extraire le premier identifiant Unicode pour reconnaître tout type de base ("tableau ...", "ensemble ...", "fichier ...")
+    const match = trimmed.match(/^[\p{L}_][\p{L}0-9_]*/u);
+    if (match) {
+        const firstWord = match[0].toLowerCase();
+        if (TYPE_MAPPING[firstWord]) {
+            return TYPE_MAPPING[firstWord];
+        }
+    }
+    // 2. Traiter les types paramétrés avec parenthèses comme "Liste(Etudiant)" -> "liste"
+    const parenIdx = trimmed.indexOf('(');
+    const base = (parenIdx !== -1 ? trimmed.substring(0, parenIdx) : trimmed).trim().toLowerCase();
     return TYPE_MAPPING[base] || base;
 }
 
@@ -357,8 +299,10 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
         // Variables de boucle Pour
         const pourVar = extractPourLoopVar(trimmed);
         if (pourVar && i < cursorLine) {
-            variables.set(pourVar, 'entier');
-            variableTypes.set(pourVar, 'entier');
+            const isChaque = /^\s*Pour\s+chaque\b/i.test(trimmed);
+            const varType = isChaque ? 'élément' : 'entier';
+            variables.set(pourVar, varType);
+            variableTypes.set(pourVar, varType);
         }
 
         // Suivi des blocs ouverts
@@ -867,35 +811,14 @@ function isInCommentOrString(lineText: string, charPos: number): boolean {
 // PROVIDER DE HOVER (info au survol)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Mots-clés du langage avec leur description pour le hover */
+/** Mots-clés du langage avec leur description pour le hover (dérivés automatiquement de PSC_DEFINITIONS) */
 const KEYWORD_DOCS: Record<string, string> = {
-    'si': '**Si** — Structure conditionnelle\n\n```psc\nSi condition Alors :\n\t...\nfsi\n```',
-    'sinon': '**Sinon** — Branche alternative d\'un Si',
-    'fsi': '**fsi** — Fermeture d\'un bloc Si',
-    'pour': '**Pour** — Boucle avec compteur\n\n```psc\nPour i de 0 à n-1 Faire :\n\t...\nfpour\n```',
-    'fpour': '**fpour** — Fermeture d\'un bloc Pour',
-    'tant': '**Tant que** — Boucle conditionnelle\n\n```psc\nTant que condition Faire :\n\t...\nftq\n```',
-    'ftq': '**ftq** — Fermeture d\'un bloc Tant que',
-    'retourner': '**retourner** — Retourne une valeur depuis une fonction',
-    'retourne': '**retourne** — Retourne une valeur depuis une fonction (variante)',
-    'début': '**Début** — Début du corps d\'une fonction ou d\'un algorithme',
-    'fin': '**Fin** — Fin du corps d\'une fonction ou d\'un algorithme',
-    'algorithme': '**Algorithme** — Déclare un algorithme principal',
-    'fonction': '**Fonction** — Déclare une fonction\n\n```psc\nFonction nom(params) : type\nDébut\n\t...\nFin\n```',
-    'alors': '**Alors** — Suit la condition d\'un Si',
-    'faire': '**Faire** — Suit la condition d\'un Tant que ou d\'un Pour',
-    'vrai': '**vrai** — Constante booléenne (true)',
-    'faux': '**faux** — Constante booléenne (false)',
-    'nil': '**nil** — Valeur nulle',
-    'et': '**et** — Opérateur logique ET (and)',
-    'ou': '**ou** — Opérateur logique OU (or)',
-    'non': '**non** — Opérateur logique NON (not)',
-    'mod': '**mod** — Opérateur modulo (reste de la division entière)',
-    'inout': '**InOut** — Modificateur de paramètre : passage par référence (entrée/sortie)',
-    'écrire': '**écrire(valeur)** — Affiche une ou plusieurs valeurs sur la sortie standard',
-    'lire': '**lire()** : chaîne — Lit une valeur depuis l\'entrée standard',
-    'fin_ligne': '**FIN_LIGNE** — Constante de fin de ligne (\\n)',
-    'décroissant': '**décroissant** — Modificateur de boucle Pour pour itérer en ordre décroissant'
+    ...Object.fromEntries(
+        PSC_DEFINITIONS.keywords
+            .filter(k => k.description)
+            .map(k => [k.name.toLowerCase(), k.description!])
+    ),
+    'fin_ligne': '**FIN_LIGNE** — Constante de fin de ligne (\\n)'
 };
 
 export class PscHoverProvider implements vscode.HoverProvider {

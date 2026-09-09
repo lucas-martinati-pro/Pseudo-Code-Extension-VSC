@@ -223,15 +223,29 @@ export function isSimpleIdentifier(identifier: string): boolean {
     return REGEX_SIMPLE_IDENTIFIER.test(identifier);
 }
 
+const REGEX_POUR_CHAQUE_VAR = /^\s*Pour\s+chaque\s+([\p{L}_][\p{L}0-9_]*)/iu;
 const REGEX_POUR_VAR = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)/iu;
 
 /**
  * Extrait le nom de la variable d'itération d'une boucle Pour.
- * Supporte : 'Pour i de ...', 'Pour i allant de ...', 'Pour elem de tab Faire'
+ * Supporte :
+ * - 'Pour chaque noeud dans ens_noeud' -> 'noeud'
+ * - 'Pour chaque elem de tab' -> 'elem'
+ * - 'Pour i de ...', 'Pour i allant de ...', 'Pour elem de tab Faire' -> 'i' / 'elem'
  */
 export function extractPourLoopVar(lineText: string): string | undefined {
+    const chaqueMatch = REGEX_POUR_CHAQUE_VAR.exec(lineText);
+    if (chaqueMatch) {
+        return chaqueMatch[1];
+    }
     const match = REGEX_POUR_VAR.exec(lineText);
-    return match ? match[1] : undefined;
+    if (match) {
+        if (match[1].toLowerCase() === 'chaque') {
+            return undefined;
+        }
+        return match[1];
+    }
+    return undefined;
 }
 
 /**

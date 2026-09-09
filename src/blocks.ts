@@ -115,6 +115,13 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
                 body: 'Pour ${1:i} de ${2:0} à ${3:n-1} Faire :\n\t${4:tab}[${1:i}] ← ${5}\nfpour',
                 detail: 'Boucle Pour pour parcourir un tableau',
                 sort: '2c2'
+            },
+            {
+                label: 'Pour (chaque)',
+                filterText: 'pourchaque pour chaque pourch',
+                body: 'Pour chaque ${1:noeud} dans ${2:ens_noeud} Faire :\n\t${3}\nfpour',
+                detail: 'Boucle Pour chaque (itération sur ensemble, table ou liste)',
+                sort: '2c3'
             }
         ]
     },
@@ -177,7 +184,7 @@ export const ALL_CLOSING_KEYWORDS = BLOCK_DEFINITIONS.flatMap(b => b.closeKeywor
 export const REGEX_ALL_CLOSING = new RegExp(`^\\s*(${ALL_CLOSING_KEYWORDS.join('|')})\\b`, 'i');
 
 /** Expression régulière pour augmenter l'indentation (ouverture de bloc, continuations, lexique) */
-export const INCREASE_INDENT_PATTERN = /^\s*(d[ée]but|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i;
+export const INCREASE_INDENT_PATTERN = /^\s*(d[ée]but|pour\b.*|.*?\b(alors|faire)\s*:?|sinon(\s+si\b.*?\balors)?\s*:?|lexique\s*:?)\s*(?:\/\/.*)?$/i;
 
 /** Expression régulière pour diminuer l'indentation (fermetures et continuations comme sinon) */
 export const DECREASE_INDENT_PATTERN = new RegExp(`^\\s*(${[...ALL_CLOSING_KEYWORDS, 'sinon'].join('|')})\\b`, 'i');

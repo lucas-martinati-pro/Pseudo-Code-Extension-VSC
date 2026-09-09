@@ -2,7 +2,7 @@
  * Transpileur Pseudo-Code vers Lua
  */
 
-import { PATTERNS, LUA_HELPERS } from './constants';
+import { PATTERNS, LUA_HELPERS, KNOWN_IDENTIFIERS_LOWER } from './constants';
 import { PSC_DEFINITIONS } from './definitions';
 import { REGEX_ALL_CLOSING } from './blocks';
 import { smartSplitArgs, findMatchingParen, protectStrings, restoreStrings, parseCompositeFields, encodeIdentifier, encodeSpecialIdentifiers } from './utils';
@@ -14,16 +14,17 @@ import { CompositeTypeRegistry } from './compositeTypes';
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const REGEX_BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
-const REGEX_LEXIQUE_BLOCK = /Lexique\s*:?[\s\S]*?(?=\n\s*(?:D\u00e9but|Fonction|Algorithme))/gi;
+const REGEX_LEXIQUE_BLOCK = /Lexique\s*:?[\s\S]*?(?=\n\s*(?:d[ée]but|Fonction|Algorithme))/gi;
 const REGEX_SMART_QUOTES = /[\u201c\u201d]/g;
 const REGEX_ALGORITHM = /^\s*algorithme\b/i;
 const REGEX_FIN = /^\s*Fin\b/i;
-const REGEX_DEBUT_OR_LEXIQUE = /^\s*(D\u00e9but|Lexique)\b/i;
+const REGEX_DEBUT_OR_LEXIQUE = /^\s*(d[ée]but|Lexique)\b/i;
 const REGEX_CLOSING_BLOCKS = REGEX_ALL_CLOSING;
 const REGEX_LIRE_ASSIGNMENT = /^\s*[\p{L}0-9_]+\s*(?:←|<-)\s*lire\s*\(\s*\)\s*$/iu;
 const REGEX_FONCTION = /^\s*fonction\s/i;
 const REGEX_FONCTION_NAME = /^\s*Fonction\s+([\p{L}_][\p{L}0-9_]*)/iu;
 const REGEX_POUR_LOOP = /^\s*Pour\s/i;
+const REGEX_POUR_CHAQUE = /^\s*Pour\s+chaque\s+([\p{L}_][\p{L}0-9_]*)\s+(?:dans|de)\s+(.+?)(?:\s+Faire)?\s*:?\s*$/iu;
 const REGEX_POUR_TABLE_ITER = /^\s*Pour\s+([\p{L}_][\p{L}0-9_]*)\s+de\s+([\p{L}_][\p{L}0-9_]*)\s+Faire\s*:?\s*$/iu;
 const REGEX_POUR_CLASSIC = /^\s*Pour\s+([\p{L}0-9_]+)\s+(?:allant de|de)\s+(.+)\s+(?:a|\u00e0)\s+(.+)\s+Faire\s*:?/iu;
 const REGEX_DECROISSANT = /\bd\u00e9croissant\b/i;
@@ -83,15 +84,8 @@ export function transpileToLua(pscCode: string): string {
     const globalArrayStartIndices = new Map<string, Array<string | number>>();
 
     const DISALLOWED_ARRAY_TARGETS = new Set([
-        'retourner', 'retourne', 'return',
-        'afficher', 'ecrire', 'écrire', 'lire',
-        'dans', 'in',
-        'et', 'ou', 'non', 'mod',
-        'si', 'alors', 'sinon', 'faire', 'cas',
-        'pour', 'allant', 'de', 'à', 'a', 'pas', 'décroissant', 'decroissant',
-        'tant', 'que',
-        'début', 'debut', 'fin', 'algorithme', 'lexique',
-        'tableau', 'liste', 'pile', 'file', 'table'
+        ...KNOWN_IDENTIFIERS_LOWER,
+        'return', 'afficher', 'in', 'cas', 'pas', 'decroissant', 'debut', 'a'
     ]);
 
     /**
@@ -364,6 +358,11 @@ export function transpileToLua(pscCode: string): string {
         if (REGEX_ALGORITHM.test(trimmedLine)) continue;
         if (REGEX_DEBUT_OR_LEXIQUE.test(trimmedLine)) continue;
 
+        // Ignorer les déclarations pures de variables (ex: 'ens_noeud : ensemble' ou 'x, y : entier')
+        if (PATTERNS.VARIABLE_DECLARATION.test(trimmedLine) && !PATTERNS.FUNCTION_DECLARATION.test(trimmedLine) && !trimmedLine.includes('←') && !trimmedLine.includes('<-') && !/:\s*=/i.test(trimmedLine)) {
+            continue;
+        }
+
         // Transformer les déclarations de types composites en constructeur Lua
         const compositeMatch = PATTERNS.COMPOSITE_TYPE.exec(trimmedLine);
         if (compositeMatch) {
@@ -535,17 +534,27 @@ export function transpileToLua(pscCode: string): string {
             }
             if (!lineIsFullyProcessed) {
                 if (REGEX_POUR_LOOP.test(trimmedLine)) {
-                    // Vérifier si c'est une boucle d'itération sur table
-                    const tableIterMatch = REGEX_POUR_TABLE_ITER.exec(trimmedLine);
-                    if (tableIterMatch) {
-                        const iterVar = tableIterMatch[1];
-                        const tableVar = tableIterMatch[2];
-                        trimmedLine = `for ${iterVar}, _ in pairs(${tableVar}._data) do`;
-                    } else {
-                        // Boucle classique
+                    // Vérifier si c'est une boucle 'Pour chaque <var> dans/de <collection>'
+                    const chaqueIterMatch = REGEX_POUR_CHAQUE.exec(trimmedLine);
+                    if (chaqueIterMatch) {
                         isForLoop = true;
-                        let step = REGEX_DECROISSANT.test(trimmedLine) ? ', -1' : ', 1';
-                        trimmedLine = trimmedLine.replace(REGEX_DECROISSANT, '').replace(REGEX_POUR_CLASSIC, `for $1 = $2, $3${step} do`);
+                        const iterVar = chaqueIterMatch[1];
+                        const collectionExpr = chaqueIterMatch[2].trim();
+                        trimmedLine = `for ${iterVar} in __psc_iter(${collectionExpr}) do`;
+                    } else {
+                        // Vérifier si c'est une boucle d'itération sur table
+                        const tableIterMatch = REGEX_POUR_TABLE_ITER.exec(trimmedLine);
+                        if (tableIterMatch) {
+                            isForLoop = true;
+                            const iterVar = tableIterMatch[1];
+                            const tableVar = tableIterMatch[2];
+                            trimmedLine = `for ${iterVar}, _ in pairs(${tableVar}._data) do`;
+                        } else {
+                            // Boucle classique
+                            isForLoop = true;
+                            let step = REGEX_DECROISSANT.test(trimmedLine) ? ', -1' : ', 1';
+                            trimmedLine = trimmedLine.replace(REGEX_DECROISSANT, '').replace(REGEX_POUR_CLASSIC, `for $1 = $2, $3${step} do`);
+                        }
                     }
                 } else if (REGEX_TANT_QUE.test(trimmedLine)) {
                     trimmedLine = trimmedLine.replace(REGEX_TANT_QUE, 'while').replace(REGEX_FAIRE, ' do');

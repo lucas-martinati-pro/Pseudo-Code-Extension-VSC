@@ -66,26 +66,29 @@
     },
     "keywords": {
       "name": "keyword.control",
-      "match": "(?i)\\b(si|alors|sinon|fsi|ftq|pour|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|Tant(?:\\s+que)|Sinon(?:\\s+si)|ftant)\\b"
+      "match": "(?i)\\b(si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|Tant(?:\\s+que)|Sinon(?:\\s+si)|ftant)\\b"
     },
     "logical-operators": {
       "name": "keyword.control",
       "match": "(?i)\\b(et|ou|non|mod)\\b"
     },
     "for-loop": {
-      "begin": "(?i)\\b(Pour)\\s+([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s+(de|allant\\s+de)\\b",
+      "begin": "(?i)\\b(Pour)\\s+(?:(chaque)\\s+)?([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s+(de|allant\\s+de|dans)\\b",
       "beginCaptures": {
         "1": {
           "name": "keyword.control"
         },
         "2": {
-          "name": "variable.other"
+          "name": "keyword.control"
         },
         "3": {
+          "name": "variable.other"
+        },
+        "4": {
           "name": "keyword.control"
         }
       },
-      "end": "(?i)\\b(Faire)\\b",
+      "end": "(?i)\\b(Faire)\\b|$",
       "endCaptures": {
         "1": {
           "name": "keyword.control"
@@ -126,7 +129,7 @@
         },
         {
           "name": "storage.type",
-          "match": "(?i)\\b(entier|réel|reel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|listesym|table|listesym|InOut)\\b(?!\\s*\\()"
+          "match": "(?i)\\b(entier|réel|reel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|listesym|table|ensemble|fichier|listesym|InOut)\\b(?!\\s*\\()"
         },
         {
           "name": "storage.type",
@@ -175,7 +178,7 @@
       ]
     },
     "function-call": {
-      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)(?=\\s*\\()",
+      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)(?=\\s*\\()",
       "captures": {
         "1": {
           "name": "entity.name.function.call"
@@ -221,7 +224,7 @@
     },
     "variables": {
       "name": "variable.other",
-      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
+      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
     }
   }
 }

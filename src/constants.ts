@@ -889,14 +889,28 @@ local function __psc_table_change(t, cle, valeur)
     return t
 end
 
--- Fonction utilitaire: vérifier si un élément est dans un ensemble (table/liste)
+-- Fonction utilitaire: vérifier si un élément est dans un ensemble (ensemble/domaine/table/liste/tableau)
 local function __psc_ensemble_estdans(ensemble, element)
+    if ensemble == nil then return false end
+    -- 1. Si c'est un TDA Table PSC ({ _type = 'table', _data = { ... } }) : vérifie la présence de la clé
+    if type(ensemble) == 'table' and ensemble._type == 'table' and ensemble._data then
+        return ensemble._data[element] ~= nil
+    end
+    -- 2. Si c'est une Liste liée PSC ({ val = ..., suc = ... }) : vérifie la présence de la valeur
+    if type(ensemble) == 'table' and (ensemble.val ~= nil or ensemble.suc ~= nil or ensemble._type == 'liste') then
+        local curr = ensemble
+        while curr ~= nil do
+            if curr.val == element then return true end
+            curr = curr.suc
+        end
+        return false
+    end
+    -- 3. Si c'est un ensemble, domaine de table ou tableau Lua
     if type(ensemble) == 'table' then
         for _, v in ipairs(ensemble) do
-            if v == element then
-                return true
-            end
+            if v == element then return true end
         end
+        if ensemble[element] ~= nil then return true end
     end
     return false
 end
@@ -914,6 +928,73 @@ local function __psc_table_from_pairs(...)
         end
     end
     return t
+end
+
+-- =================================================================================================================
+-- Itérateur universel pour 'Pour chaque <x> dans <ensemble/table/liste/tableau/chaîne>'
+-- =================================================================================================================
+local function __psc_iter(col)
+    if col == nil then
+        return function() return nil end
+    end
+    -- 1. Si c'est un TDA Table PSC ({ _type = 'table', _data = { ... } })
+    if type(col) == 'table' and col._type == 'table' and col._data then
+        local nextFn, t, k = pairs(col._data)
+        return function()
+            k = nextFn(t, k)
+            return k
+        end
+    end
+    -- 2. Si c'est une Liste liée PSC ({ val = ..., suc = ... })
+    if type(col) == 'table' and (col.val ~= nil or col.suc ~= nil or col._type == 'liste') then
+        local curr = col
+        return function()
+            if curr ~= nil then
+                local v = curr.val
+                curr = curr.suc
+                return v
+            end
+            return nil
+        end
+    end
+    -- 3. Si c'est un tableau séquentiel ou une table Lua
+    if type(col) == 'table' then
+        local n = #col
+        if n > 0 then
+            local i = 0
+            return function()
+                i = i + 1
+                if i <= n then return col[i] end
+                return nil
+            end
+        else
+            -- Table associative / ensemble à clés { [e1]=true, ... }
+            local nextFn, t, k = pairs(col)
+            return function()
+                local v
+                k, v = nextFn(t, k)
+                while k == '_type' or k == '_data' do
+                    k, v = nextFn(t, k)
+                end
+                if k ~= nil then
+                    if v == true then return k end
+                    return k
+                end
+                return nil
+            end
+        end
+    end
+    -- 4. Si c'est une chaîne
+    if type(col) == 'string' then
+        local i = 0
+        local len = #col
+        return function()
+            i = i + 1
+            if i <= len then return col:sub(i, i) end
+            return nil
+        end
+    end
+    return function() return nil end
 end
 
 -- =================================================================================================================

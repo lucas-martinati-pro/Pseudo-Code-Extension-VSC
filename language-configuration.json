@@ -25,14 +25,14 @@
   ],
   "folding": {
     "markers": {
-      "start": "^\\s*(?:[Dd][éeÉ]but|[Ss]i\\b.*[Aa]lors\\s*:?|[Pp]our\\b.*[Ff]aire\\s*:?|[Tt]ant\\s+[Qq]ue\\b.*[Ff]aire\\s*:?|[Ss]inon\\s*:?)\\s*(?://.*)?$",
+      "start": "^\\s*(?:[Dd][éeÉ]but|[Ss]i\\b.*[Aa]lors\\s*:?|[Pp]our\\b.*|[Tt]ant\\s+[Qq]ue\\b.*[Ff]aire\\s*:?|[Ss]inon\\s*:?)\\s*(?://.*)?$",
       "end": "^\\s*(?:[Ff]in|[Ff]si|[Ff]pour|[Ff]tq|[Ff]tant)\\b"
     }
   },
   "wordPattern": "(-?\\d*\\.\\d\\w*)|([^\\`\\~\\!\\@\\#\\%\\^\\&\\*\\(\\)\\-\\=\\+\\[\\{\\]\\}\\\\\\|\\;\\:\\'\\\"\\,\\.\\<\\>\\/\\?\\s]+)",
   "indentationRules": {
     "increaseIndentPattern": {
-      "pattern": "^\\s*(d[ée]but|.*\\b(alors|faire)\\s*:?|sinon(\\s+si\\b.*\\balors)?\\s*:?|lexique\\s*:?)\\s*(//.*)?$",
+      "pattern": "^\\s*(d[ée]but|pour\\b.*|.*\\b(alors|faire)\\s*:?|sinon(\\s+si\\b.*\\balors)?\\s*:?|lexique\\s*:?)\\s*(//.*)?$",
       "flags": "i"
     },
     "decreaseIndentPattern": {
@@ -43,7 +43,7 @@
   "onEnterRules": [
     {
       "beforeText": {
-        "pattern": "^\\s*(d[ée]but|.*\\b(alors|faire)\\s*:?|sinon(\\s+si\\b.*\\balors)?\\s*:?)\\s*(//.*)?$",
+        "pattern": "^\\s*(d[ée]but|pour\\b.*|.*\\b(alors|faire)\\s*:?|sinon(\\s+si\\b.*\\balors)?\\s*:?)\\s*(//.*)?$",
         "flags": "i"
       },
       "afterText": {
@@ -56,7 +56,7 @@
     },
     {
       "beforeText": {
-        "pattern": "^\\s*(d[ée]but|.*\\b(alors|faire)\\s*:?|sinon(\\s+si\\b.*\\balors)?\\s*:?|lexique\\s*:?)\\s*(//.*)?$",
+        "pattern": "^\\s*(d[ée]but|pour\\b.*|.*\\b(alors|faire)\\s*:?|sinon(\\s+si\\b.*\\balors)?\\s*:?|lexique\\s*:?)\\s*(//.*)?$",
         "flags": "i"
       },
       "action": {
