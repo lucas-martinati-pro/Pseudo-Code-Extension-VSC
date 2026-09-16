@@ -1,3 +1,19 @@
+# 🚀 Release v0.4.23 — PseudoCode Language Interpreter
+
+### 🐛 Corrections
+- **Accès aux tableaux avec bornes dynamiques / variables :**
+  - Correction d'un décalage d'indice erroné lors de l'accès aux tableaux déclarés avec des bornes variables (ex. `tab InOut : Tableau entier[borne_inf..borne_sup]`).
+  - Lorsque la borne de début est un identifiant de variable, aucun décalage d'offset n'est appliqué (`tab[i]` reste `tab[i]`), préservant l'indexation absolue Lua (1..N) pour les tableaux passés en référence (`InOut`).
+  - Élimine les erreurs d'exécution (ex. `attempt to index a nil value`) dans les algorithmes récursifs de tri (QuickSort, tri fusion) et de recherche dichotomique.
+
+### 🧪 Tests & Démonstrations
+- **Suites de validation 100% natives en Pseudo-Code (`.psc`) :**
+  - Ajout de `examples/DEMO_TRI_BORNES_VARIABLES.psc` : implémentation complète et test du tri rapide (QuickSort récursif avec partition de Lomuto) utilisant des bornes variables.
+  - Ajout de `examples/DEMO_DECALAGES_INDICES.psc` : suite de 5 tests automatisés couvrant tous les cas de bornes (bornes variables, 0-indexées, indices négatifs, 1-indexées et récursives).
+  - Intégration transparente dans la suite de tests automatisée `npm test` via `test-all-files.js`, sans nécessiter de script intermédiaire en JavaScript.
+
+---
+
 # 🚀 Release v0.4.22 — PseudoCode Language Interpreter
 
 ### ✨ Nouveautés Majeures

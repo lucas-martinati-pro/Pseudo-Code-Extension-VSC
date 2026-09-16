@@ -230,6 +230,11 @@ export function transpileToLua(pscCode: string): string {
                                         transformed += `[(${resolvedExpr})]`;
                                     } else if (startIndex === 0 || startIndex === '0' || !startIndex) {
                                         transformed += `[(${resolvedExpr}) + 1]`;
+                                    } else if (typeof startIndex === 'string' && !/^-?\d+$/.test(startIndex)) {
+                                        // L'indice de départ est un identifiant de variable (ex: borne_inf).
+                                        // Pour les paramètres InOut, le tableau passé conserve ses indices
+                                        // absolus (1..N en Lua), donc aucun décalage ne doit être appliqué.
+                                        transformed += `[(${resolvedExpr})]`;
                                     } else {
                                         transformed += `[(${resolvedExpr}) - (${startIndex}) + 1]`;
                                     }
