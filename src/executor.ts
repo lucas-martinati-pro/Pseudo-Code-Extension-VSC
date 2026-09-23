@@ -363,6 +363,16 @@ export function transpileToLua(pscCode: string): string {
         if (REGEX_ALGORITHM.test(trimmedLine)) continue;
         if (REGEX_DEBUT_OR_LEXIQUE.test(trimmedLine)) continue;
 
+        // Ignorer les déclarations de type alias (ex: 'Soit ArbreBinaireEntier = arbin[entier]')
+        if (/^\s*Soit\s+[\p{L}_][\p{L}0-9_]*\s*=/iu.test(trimmedLine)) {
+            continue;
+        }
+
+        // Supprimer le mot-clé 'Soit' en début de ligne pour les déclarations ou assignations (ex: 'Soit x : entier')
+        if (/^\s*Soit\s+/iu.test(trimmedLine)) {
+            trimmedLine = trimmedLine.replace(/^\s*Soit\s+/iu, '');
+        }
+
         // Ignorer les déclarations pures de variables (ex: 'ens_noeud : ensemble' ou 'x, y : entier')
         if (PATTERNS.VARIABLE_DECLARATION.test(trimmedLine) && !PATTERNS.FUNCTION_DECLARATION.test(trimmedLine) && !trimmedLine.includes('←') && !trimmedLine.includes('<-') && !/:\s*=/i.test(trimmedLine)) {
             continue;
@@ -485,7 +495,11 @@ export function transpileToLua(pscCode: string): string {
                 .replace(/\bfichier\s+[eé]crire\b/giu, 'fichierecrire')
                 .replace(/\bcha[iî]ne\s+vers\s+entier\b/giu, 'chaineversentier')
                 .replace(/\bd[eé]piler\b/giu, 'depiler')
-                .replace(/\bd[eé]filer\b/giu, 'defiler');
+                .replace(/\bd[eé]filer\b/giu, 'defiler')
+                .replace(/\bcr[eé]er\s*arb\b/giu, 'creerarb')
+                .replace(/\bcr[eé]er\s*arbre\b/giu, 'creerarb')
+                .replace(/\barbre\s*vide\b/giu, 'arbrevide')
+                .replace(/\bnoeud\s*vide\b/giu, 'noeudvide');
 
             if (REGEX_FONCTION.test(trimmedLine)) {
                 const funcNameMatch = REGEX_FONCTION_NAME.exec(trimmedLine);
@@ -674,6 +688,27 @@ export function transpileToLua(pscCode: string): string {
                         const normalizedArgs = args.replace(/\s*→\s*/g, ', ');
                         trimmedLine = before + `__psc_table_from_pairs(${normalizedArgs})` + after;
                         tableRegex.lastIndex = 0;
+                    }
+                }
+            }
+
+            // 6. arbin(val) / arbreBinaire(val) → constructeur arbre binaire
+            {
+                const arbinRegex = /\b(?:arbin|arbrebinaire)\s*\(/gi;
+                let arbinMatch;
+                while ((arbinMatch = arbinRegex.exec(trimmedLine)) !== null) {
+                    const beforeMatch = trimmedLine.slice(0, arbinMatch.index);
+                    if (/:\s*$/.test(beforeMatch)) {
+                        break;
+                    }
+                    const openIdx = arbinMatch.index + arbinMatch[0].length - 1;
+                    const closeIdx = findMatchingParen(trimmedLine, openIdx);
+                    if (closeIdx !== -1) {
+                        const args = trimmedLine.slice(openIdx + 1, closeIdx);
+                        const before = trimmedLine.slice(0, arbinMatch.index);
+                        const after = trimmedLine.slice(closeIdx + 1);
+                        trimmedLine = before + `__psc_arbin_creer(${args})` + after;
+                        arbinRegex.lastIndex = 0;
                     }
                 }
             }

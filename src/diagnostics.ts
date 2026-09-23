@@ -63,6 +63,13 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
             continue;
         }
 
+        // Détection type alias (ex: 'Soit ArbreBinaireEntier = arbin[entier]')
+        const typeAliasMatch = /^\s*Soit\s+([\p{L}_][\p{L}0-9_]*)\s*=/iu.exec(trimmed);
+        if (typeAliasMatch) {
+            declaredCompositeTypes.add(typeAliasMatch[1].toLowerCase());
+            continue;
+        }
+
         // Détection du début d'un bloc Lexique
         if (REGEX_LEXIQUE_LINE.test(trimmed)) {
             inLexiqueBlock = true;
@@ -102,13 +109,18 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
 
         if (trimmedText === '' || /^\s*Algorithme\b/i.test(trimmedText) || /^\s*Lexique\b/i.test(trimmedText)) continue;
 
-        // Ignorer les déclarations de types composites
-        if (PATTERNS.COMPOSITE_TYPE.test(trimmedText)) continue;
+        // Ignorer les déclarations de types composites et types alias
+        if (PATTERNS.COMPOSITE_TYPE.test(trimmedText) || /^\s*Soit\s+[\p{L}_][\p{L}0-9_]*\s*=/iu.test(trimmedText)) continue;
+
+        let processedText = trimmedText;
+        if (/^\s*Soit\s+/iu.test(processedText)) {
+            processedText = processedText.replace(/^\s*Soit\s+/iu, '');
+        }
 
         // ─── Détection des blocs ouvrants ───
-        const openingBlock = findOpeningBlock(trimmedText);
-        const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(trimmedText);
-        const pourVar = extractPourLoopVar(trimmedText);
+        const openingBlock = findOpeningBlock(processedText);
+        const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(processedText);
+        const pourVar = extractPourLoopVar(processedText);
 
         // Suivi des blocs ouvrants
         if (openingBlock) {
@@ -189,15 +201,15 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
             scopeStack.push(newScope);
         }
 
-        const declarationMatch = PATTERNS.VARIABLE_DECLARATION.exec(trimmedText);
+        const declarationMatch = PATTERNS.VARIABLE_DECLARATION.exec(processedText);
         
         // Détecter les affectations (←, <-, =)
-        let assignMatch = trimmedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*(?:←|<-)\s*(.+)$/u);
-        if (!assignMatch && !openingBlock && !PATTERNS.FUNCTION_DECLARATION.test(trimmedText)) {
-            assignMatch = trimmedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*=\s*([^=].*)$/u);
+        let assignMatch = processedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*(?:←|<-)\s*(.+)$/u);
+        if (!assignMatch && !openingBlock && !PATTERNS.FUNCTION_DECLARATION.test(processedText)) {
+            assignMatch = processedText.match(/^([\p{L}_][\p{L}0-9_]*(?:\s*\[[^\]]*\])?(?:\.[\p{L}_][\p{L}0-9_]*)*)\s*=\s*([^=].*)$/u);
         }
 
-        if (declarationMatch && !PATTERNS.FUNCTION_DECLARATION.test(trimmedText) && !assignMatch) {
+        if (declarationMatch && !PATTERNS.FUNCTION_DECLARATION.test(processedText) && !assignMatch) {
             const varNames = declarationMatch[1].split(',');
             const currentScope = scopeStack[scopeStack.length - 1];
             for (const v of varNames) {

@@ -60,7 +60,7 @@ export const PATTERNS = {
     FUNCTION_CALL: /([\p{L}_][\p{L}0-9_]+)\s*\(([^)]*)\)/gu,
 
     // Variables
-    VARIABLE_DECLARATION: /^([\p{L}0-9_,\s]+?)\s*:\s*([\p{L}0-9_]+(?:\([^()]*\))?)/iu,
+    VARIABLE_DECLARATION: /^([\p{L}0-9_,\s]+?)\s*:\s*([\p{L}0-9_]+(?:\([^()]*\)|\[[^[\]]*\])?)/iu,
     ASSIGNMENT: /←/,
     READ_ASSIGNMENT: /^\s*[\p{L}0-9_]+\s*←\s*lire\s*\(\s*\)\s*$/iu,
 
@@ -360,8 +360,22 @@ local function __psc_serialize(v)
     end
     
     if type(v) == 'table' then
-        -- Vérifier d'abord si c'est une Pile ou File (avec métadonnée _type)
-        if v._type == 'pile' then
+        -- Vérifier d'abord si c'est un Arbre Binaire ou un Noeud
+        if v._type == 'arbin' then
+            local function __psc_serialize_node(n)
+                if n == nil then return 'nil' end
+                if n.fg == nil and n.fd == nil then
+                    return __psc_serialize(n.val)
+                end
+                return __psc_serialize(n.val) .. '(' .. __psc_serialize_node(n.fg) .. ', ' .. __psc_serialize_node(n.fd) .. ')'
+            end
+            if v.root == nil then
+                return 'ArbreBin(nil)'
+            end
+            return 'ArbreBin(' .. __psc_serialize_node(v.root) .. ')'
+        elseif v._type == 'noeud' then
+            return 'Noeud(' .. __psc_serialize(v.val) .. ')'
+        elseif v._type == 'pile' then
             local parts = {}
             for i = 1, #v do
                 parts[#parts+1] = __psc_serialize(v[i])
@@ -516,6 +530,19 @@ local function __psc_liste_tete(l)
     return 0
 end
 local function __psc_liste_val(l, p)
+    if l == nil and p == nil then return nil end
+    -- Cas Arbre Binaire : val(arbre, noeud) ou val(noeud)
+    if type(p) == 'table' and p.val ~= nil then
+        return p.val
+    end
+    if type(l) == 'table' and l._type == 'arbin' then
+        if type(p) == 'table' then return p.val end
+        return nil
+    end
+    if p == nil and type(l) == 'table' and l.val ~= nil and l.suc == nil then
+        return l.val
+    end
+    -- Cas standard Liste (places entières)
     local node = l
     local i = p or 0
     while node ~= nil and i > 0 do
@@ -1053,6 +1080,186 @@ local changeTable = __psc_table_change
 local accesTable = __psc_table_acces
 local domaineTable = __psc_table_domaine
 local estDans = __psc_ensemble_estdans
+
+-- =================================================================================================================
+-- TDA Arbre Binaire
+-- =================================================================================================================
+local function __psc_arbin_creer(v)
+    if v == nil then
+        return { _type = 'arbin', root = nil }
+    end
+    local root = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = nil }
+    return { _type = 'arbin', root = root }
+end
+
+local function __psc_arbin_vide(a)
+    if a == nil then
+        return { _type = 'arbin', root = nil }
+    end
+    if type(a) == 'table' and a._type == 'arbin' then
+        return a.root == nil
+    end
+    return a == nil
+end
+
+local function __psc_arbin_racine(a)
+    if a == nil then return nil end
+    if type(a) == 'table' then
+        if a._type == 'arbin' then
+            return a.root
+        end
+        return a
+    end
+    return nil
+end
+
+local function __psc_arbin_fg(a, n)
+    if n == nil then
+        if type(a) == 'table' then
+            if a._type == 'arbin' then
+                return a.root and a.root.fg or nil
+            end
+            return a.fg
+        end
+        return nil
+    end
+    if type(n) == 'table' then
+        if n._type == 'arbin' then
+            return n.root and n.root.fg or nil
+        end
+        return n.fg
+    end
+    return nil
+end
+
+local function __psc_arbin_fd(a, n)
+    if n == nil then
+        if type(a) == 'table' then
+            if a._type == 'arbin' then
+                return a.root and a.root.fd or nil
+            end
+            return a.fd
+        end
+        return nil
+    end
+    if type(n) == 'table' then
+        if n._type == 'arbin' then
+            return n.root and n.root.fd or nil
+        end
+        return n.fd
+    end
+    return nil
+end
+
+local function __psc_arbin_pere(a, n)
+    if n == nil then
+        if type(a) == 'table' then
+            return a.parent
+        end
+        return nil
+    end
+    if type(n) == 'table' then
+        return n.parent
+    end
+    return nil
+end
+
+local function __psc_arbin_noeudvide(...)
+    local nArgs = select("#", ...)
+    if nArgs >= 2 then
+        local a, n = ...
+        return n == nil
+    elseif nArgs == 1 then
+        local n = ...
+        return n == nil
+    end
+    return true
+end
+
+local function __psc_arbin_adjfg(a, n, v)
+    if a == nil and n == nil then return end
+    local target = n
+    if target == nil and type(a) == 'table' and a._type == 'arbin' then
+        if a.root == nil then
+            a.root = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = nil }
+            return a
+        end
+        target = a.root
+    elseif type(target) == 'table' and target._type == 'arbin' then
+        target = target.root
+    end
+    if target ~= nil and type(target) == 'table' then
+        target.fg = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = target }
+    end
+    return a
+end
+
+local function __psc_arbin_adjfd(a, n, v)
+    if a == nil and n == nil then return end
+    local target = n
+    if target == nil and type(a) == 'table' and a._type == 'arbin' then
+        if a.root == nil then
+            a.root = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = nil }
+            return a
+        end
+        target = a.root
+    elseif type(target) == 'table' and target._type == 'arbin' then
+        target = target.root
+    end
+    if target ~= nil and type(target) == 'table' then
+        target.fd = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = target }
+    end
+    return a
+end
+
+local function __psc_arbin_chgarb(a, n, v)
+    local target = n
+    if type(target) == 'table' and target._type == 'arbin' then
+        target = target.root
+    end
+    if target ~= nil and type(target) == 'table' then
+        target.val = v
+    end
+    return a
+end
+
+local function __psc_arbin_supfg(a, n)
+    local target = n
+    if type(target) == 'table' and target._type == 'arbin' then
+        target = target.root
+    end
+    if target ~= nil and type(target) == 'table' then
+        target.fg = nil
+    end
+    return a
+end
+
+local function __psc_arbin_supfd(a, n)
+    local target = n
+    if type(target) == 'table' and target._type == 'arbin' then
+        target = target.root
+    end
+    if target ~= nil and type(target) == 'table' then
+        target.fd = nil
+    end
+    return a
+end
+
+local racine = __psc_arbin_racine
+local fg = __psc_arbin_fg
+local fd = __psc_arbin_fd
+local pere = __psc_arbin_pere
+local noeudvide = __psc_arbin_noeudvide
+local noeudVide = __psc_arbin_noeudvide
+local creerarb = __psc_arbin_creer
+local cr_eacute__eacute_rarb = __psc_arbin_creer
+local adjfg = __psc_arbin_adjfg
+local adjfd = __psc_arbin_adjfd
+local chgarb = __psc_arbin_chgarb
+local supfg = __psc_arbin_supfg
+local supfd = __psc_arbin_supfd
+local arbrevide = __psc_arbin_vide
+local arbreVide = __psc_arbin_vide
 
 -- =================================================================================================================
 -- =================================================================================================================

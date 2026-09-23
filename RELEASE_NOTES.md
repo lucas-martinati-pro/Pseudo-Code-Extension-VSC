@@ -1,3 +1,46 @@
+# 🚀 Release v0.4.24 — PseudoCode Language Interpreter
+
+### ✨ Nouveautés Majeures : Support des Arbres Binaires (TDA)
+- **Système de Types & Déclarations :**
+  - Introduction du type de données abstrait `arbin[V]` (et de ses alias `ArbreBinaire`, `ArbreBinaireEntier`, `ArbreBinaireChaîne`, `ArbreBinaireBooleen`, `ArbreBinaireReel`).
+  - Prise en charge des types paramétrés avec crochets (`arbin[entier]`, `arbin[chaine]`, etc.).
+  - Introduction du type référence de nœud `Noeud` / `nœud` (avec gestion de la référence fictive `nil`).
+  - Prise en charge du mot-clé `Soit` pour la déclaration d'alias de types (ex. `Soit ArbreBinaireEntier = arbin[entier]`) et de variables.
+- **Primitives d'Inspection & d'Accès :**
+  - `racine(a)` : Renvoie la racine (premier nœud) de l'arbre binaire `a` (`nil` si vide).
+  - `val(a, n)` / `val(n)` : Renvoie la valeur associée au nœud `n` (compatible avec les listes et les arbres binaires).
+  - `fg(a, n)` / `fg(n)` : Renvoie le fils gauche du nœud `n` dans l'arbre `a` (`nil` si absent).
+  - `fd(a, n)` / `fd(n)` : Renvoie le fils droit du nœud `n` dans l'arbre `a` (`nil` si absent).
+  - `pere(a, n)` / `pere(n)` : Renvoie le parent (père) du nœud `n` (`nil` si racine).
+  - `noeudvide(a, n)` / `noeudvide(n)` : Prédicat testant si un nœud est `nil` (supporte les arités 1 et 2 pour s'adapter à toutes les syntaxes de cours).
+- **Primitives de Construction, Mise à Jour & Destructeurs :**
+  - `créerarb(v)` / `creerarb(v)` : Instancie un nouvel arbre binaire avec une racine contenant `v` (ou arbre vide si omis).
+  - `arbrevide()` / `arbreVide()` : Instancie un arbre binaire vide ou teste si un arbre est vide.
+  - `adjfg(a, n, v)` : Adjonction en place d'un fils gauche avec valeur `v` au nœud `n`.
+  - `adjfd(a, n, v)` : Adjonction en place d'un fils droit avec valeur `v` au nœud `n`.
+  - `chgarb(a, n, v)` : Modification en place de la valeur du nœud `n` en lui affectant `v`.
+  - `supfg(a, n)` : Suppression brutale de l'intégralité du sous-arbre gauche de `n`.
+  - `supfd(a, n)` : Suppression brutale de l'intégralité du sous-arbre droit de `n`.
+- **Affichage & Sérialisation enrichie :**
+  - Sérialisation hiérarchique récursive dans `écrire(...)` : `ArbreBin(1(2(nil, 7), 3))`.
+  - Affichage direct des nœuds : `Noeud(val)`.
+- **IntelliSense, Diagnostics & TextMate :**
+  - Coloration syntaxique TextMate synchronisée (`storage.type`, `keyword.control`, `support.function`).
+  - Autocomplétion et suggestions contextuelles par point (`arbre.racine()`, `arbre.fg(n)`, `arbre.chgarb(n, v)`...).
+  - Diagnostic en temps réel (Linter) : reconnaissance immédiate des alias de types `Soit ... = ...` et absence de faux positifs sur les identifiants déclarés.
+
+### 🧪 Tests & Démonstrations
+- **Validation 100% native en Pseudo-Code :**
+  - Ajout de `examples/DEMO_ARBRES_BINAIRES.psc` couvrant l'intégralité de la spécification :
+    - Déclarations d'alias et de variables.
+    - Construction, modification et suppression pas à pas (Exemples 1 & 2).
+    - Parcours récursifs Préfixé, Infixé et Postfixé (Exercice 1).
+    - Comptage récursif des feuilles (`compterFeuilles` — Exercice 2).
+    - Arbres miroirs et test de symétrie (`sontMiroirs`, `estSymetrique` — Exercice 3).
+  - Intégration à la suite de tests automatisée `npm test` : 5/5 fichiers de démonstration validés et exécutés avec succès.
+
+---
+
 # 🚀 Release v0.4.23 — PseudoCode Language Interpreter
 
 ### 🐛 Corrections

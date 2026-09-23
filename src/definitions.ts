@@ -54,11 +54,14 @@ export const PSC_DEFINITIONS = {
         { name: 'listesym', aliases: ['listesym'], description: 'Liste symétrique (TDA)' },
         { name: 'table', aliases: ['table'], description: 'Table associative clé→valeur (TDA)' },
         { name: 'ensemble', aliases: ['ensemble'], description: 'Ensemble de valeurs uniques (TDA)' },
-        { name: 'fichier', aliases: ['fichier'], description: 'Descripteur de fichier (TDA)' }
+        { name: 'fichier', aliases: ['fichier'], description: 'Descripteur de fichier (TDA)' },
+        { name: 'arbin', aliases: ['arbin', 'arbrebinaire', 'arbrebinaireentier', 'arbrebinairechaine', 'arbrebinairechaîne', 'arbrebinairebooleen', 'arbrebinairebooléen', 'arbrebinairereel', 'arbrebinaireréel'], description: 'Arbre binaire (TDA)' },
+        { name: 'noeud', aliases: ['noeud', 'nœud'], description: 'Référence vers un nœud d\'arbre binaire (TDA)' }
     ] as PscType[],
 
     keywords: [
         // Contrôle
+        { name: 'soit', type: 'control', description: '**Soit** — Déclaration de type alias ou variable' },
         { name: 'si', type: 'control', luaEquivalent: 'if', description: '**Si** — Structure conditionnelle\n\n```psc\nSi condition Alors :\n\t...\nfsi\n```' },
         { name: 'alors', type: 'control', luaEquivalent: 'then', description: '**Alors** — Suit la condition d\'un Si' },
         { name: 'sinon', type: 'control', luaEquivalent: 'else', description: '**Sinon** — Branche alternative d\'un Si' },
@@ -122,9 +125,9 @@ export const PSC_DEFINITIONS = {
         // Comparaison générale
         { name: 'comparaison', arity: 2, luaHelper: '__psc_comparaison', description: 'Compare deux éléments (réels, chaînes, enregistrements/structures)', signature: 'comparaison(a, b) : booléen', snippet: 'comparaison(${1:a}, ${2:b})', category: 'Autre' },
 
-        // TDA Liste
+        // TDA Liste & Structures
         { name: 'tete', arity: 1, luaHelper: '__psc_generic_tete', description: 'Retourne la place de tête de la liste', signature: 'tete(l : Liste) : place', snippet: 'tete(${1:l})', methodSnippet: 'tete(${VAR})', category: 'Liste', targetType: 'liste' },
-        { name: 'val', arity: 2, luaHelper: '__psc_liste_val', description: 'Retourne la valeur à la place p', signature: 'val(l : Liste, p : place) : élément', snippet: 'val(${1:l}, ${2:p})', methodSnippet: 'val(${VAR}, ${1:p})', category: 'Liste', targetType: 'liste' },
+        { name: 'val', arity: [1, 2], luaHelper: '__psc_liste_val', description: 'Retourne la valeur d\'un nœud ou à la place p', signature: 'val(col, place_ou_noeud) : élément', snippet: 'val(${1:arbre}, ${2:noeud})', methodSnippet: 'val(${VAR}, ${1:place_ou_noeud})', category: 'Structure', targetType: ['liste', 'arbin', 'arbrebinaire', 'noeud'] },
         { name: 'suc', arity: 2, luaHelper: '__psc_liste_suc', description: 'Retourne la place suivante', signature: 'suc(l : Liste, p : place) : place', snippet: 'suc(${1:l}, ${2:p})', methodSnippet: 'suc(${VAR}, ${1:p})', category: 'Liste', targetType: 'liste' },
         { name: 'finliste', arity: 2, luaHelper: '__psc_liste_fin', description: 'Vrai si p est en fin de liste', signature: 'finListe(l : Liste, p : place) : booléen', snippet: 'finListe(${1:l}, ${2:p})', methodSnippet: 'finListe(${VAR}, ${1:p})', category: 'Liste', targetType: 'liste' },
         { name: 'listevide', arity: 0, luaHelper: '__psc_liste_vide', description: 'Crée une liste vide', signature: 'listeVide() : Liste', snippet: 'listeVide()', category: 'Liste', targetType: 'liste' },
@@ -182,6 +185,21 @@ export const PSC_DEFINITIONS = {
         { name: 'ajouttable', arity: 3, luaHelper: '__psc_table_ajout', isMutator: true, description: 'Ajoute une entrée (clé, valeur)', signature: 'ajoutTable(t : Table, clé, valeur)', snippet: 'ajoutTable(${1:t}, ${2:clé}, ${3:valeur})', methodSnippet: 'ajoutTable(${VAR}, ${1:clé}, ${2:valeur})', category: 'Table', targetType: 'table' },
         { name: 'suppressiontable', arity: 2, luaHelper: '__psc_table_suppression', isMutator: true, description: 'Supprime une entrée', signature: 'suppressionTable(t : Table, clé)', snippet: 'suppressionTable(${1:t}, ${2:clé})', methodSnippet: 'suppressionTable(${VAR}, ${1:clé})', category: 'Table', targetType: 'table' },
         { name: 'changetable', arity: 3, luaHelper: '__psc_table_change', isMutator: true, description: 'Change la valeur d\'une clé', signature: 'changeTable(t : Table, clé, valeur)', snippet: 'changeTable(${1:t}, ${2:clé}, ${3:valeur})', methodSnippet: 'changeTable(${VAR}, ${1:clé}, ${2:valeur})', category: 'Table', targetType: 'table' },
-        { name: 'estdans', arity: 2, luaHelper: '__psc_ensemble_estdans', description: 'Vérifie si un élément appartient à un ensemble (ex: domaine(t)), une table ou une liste', signature: 'estDans(col, élément) : booléen', snippet: 'estDans(${1:col}, ${2:élément})', methodSnippet: 'estDans(${VAR}, ${1:élément})', category: 'Ensemble', targetType: ['ensemble', 'table', 'liste'] }
+        { name: 'estdans', arity: 2, luaHelper: '__psc_ensemble_estdans', description: 'Vérifie si un élément appartient à un ensemble (ex: domaine(t)), une table ou une liste', signature: 'estDans(col, élément) : booléen', snippet: 'estDans(${1:col}, ${2:élément})', methodSnippet: 'estDans(${VAR}, ${1:élément})', category: 'Ensemble', targetType: ['ensemble', 'table', 'liste'] },
+        
+        // TDA Arbre Binaire
+        { name: 'racine', arity: 1, luaHelper: '__psc_arbin_racine', description: 'Renvoie la racine (premier nœud) de l\'arbre binaire', signature: 'racine(a : ArbreBinaire) : Noeud', snippet: 'racine(${1:a})', methodSnippet: 'racine(${VAR})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'fg', arity: [1, 2], luaHelper: '__psc_arbin_fg', description: 'Renvoie le fils gauche du nœud n dans l\'arbre a (nil si absent)', signature: 'fg(a : ArbreBinaire, n : Noeud) : Noeud', snippet: 'fg(${1:a}, ${2:n})', methodSnippet: 'fg(${VAR}, ${1:n})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'fd', arity: [1, 2], luaHelper: '__psc_arbin_fd', description: 'Renvoie le fils droit du nœud n dans l\'arbre a (nil si absent)', signature: 'fd(a : ArbreBinaire, n : Noeud) : Noeud', snippet: 'fd(${1:a}, ${2:n})', methodSnippet: 'fd(${VAR}, ${1:n})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'noeudvide', arity: [1, 2], luaHelper: '__psc_arbin_noeudvide', description: 'Renvoie VRAI si le nœud n est nil (vide), FAUX sinon', signature: 'noeudvide(a : ArbreBinaire, n : Noeud) : booléen', snippet: 'noeudvide(${1:a}, ${2:n})', methodSnippet: 'noeudvide(${VAR}, ${1:n})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'creerarb', arity: [0, 1], luaHelper: '__psc_arbin_creer', description: 'Crée un nouvel arbre binaire avec une racine contenant la valeur v (ou vide)', signature: 'créerarb(v : V) : ArbreBinaire', snippet: 'créerarb(${1:v})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire'] },
+        { name: 'créerarb', arity: [0, 1], luaHelper: '__psc_arbin_creer', description: 'Crée un nouvel arbre binaire avec une racine contenant la valeur v (ou vide)', signature: 'créerarb(v : V) : ArbreBinaire', snippet: 'créerarb(${1:v})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire'] },
+        { name: 'adjfg', arity: 3, luaHelper: '__psc_arbin_adjfg', description: 'Adjonction d\'un fils gauche au nœud n avec la valeur v', signature: 'adjfg(a : ArbreBinaire, n : Noeud, v : V)', snippet: 'adjfg(${1:a}, ${2:n}, ${3:v})', methodSnippet: 'adjfg(${VAR}, ${1:n}, ${2:v})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'adjfd', arity: 3, luaHelper: '__psc_arbin_adjfd', description: 'Adjonction d\'un fils droit au nœud n avec la valeur v', signature: 'adjfd(a : ArbreBinaire, n : Noeud, v : V)', snippet: 'adjfd(${1:a}, ${2:n}, ${3:v})', methodSnippet: 'adjfd(${VAR}, ${1:n}, ${2:v})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'chgarb', arity: 3, luaHelper: '__psc_arbin_chgarb', description: 'Modifie la valeur du nœud n dans l\'arbre a en lui affectant v', signature: 'chgarb(a : ArbreBinaire, n : Noeud, v : V)', snippet: 'chgarb(${1:a}, ${2:n}, ${3:v})', methodSnippet: 'chgarb(${VAR}, ${1:n}, ${2:v})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'supfg', arity: 2, luaHelper: '__psc_arbin_supfg', description: 'Supprime l\'intégralité du sous-arbre gauche du nœud n', signature: 'supfg(a : ArbreBinaire, n : Noeud)', snippet: 'supfg(${1:a}, ${2:n})', methodSnippet: 'supfg(${VAR}, ${1:n})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'supfd', arity: 2, luaHelper: '__psc_arbin_supfd', description: 'Supprime l\'intégralité du sous-arbre droit du nœud n', signature: 'supfd(a : ArbreBinaire, n : Noeud)', snippet: 'supfd(${1:a}, ${2:n})', methodSnippet: 'supfd(${VAR}, ${1:n})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] },
+        { name: 'arbrevide', arity: [0, 1], luaHelper: '__psc_arbin_vide', description: 'Crée un arbre binaire vide (ou teste si l\'arbre est vide)', signature: 'arbreVide() : ArbreBinaire', snippet: 'arbreVide()', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire'] },
+        { name: 'pere', arity: [1, 2], luaHelper: '__psc_arbin_pere', description: 'Renvoie le parent (père) du nœud n dans l\'arbre a (nil si racine)', signature: 'pere(a : ArbreBinaire, n : Noeud) : Noeud', snippet: 'pere(${1:a}, ${2:n})', methodSnippet: 'pere(${VAR}, ${1:n})', category: 'Arbre Binaire', targetType: ['arbin', 'arbrebinaire', 'noeud'] }
     ] as PscFunction[]
 };

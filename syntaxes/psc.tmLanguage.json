@@ -66,7 +66,7 @@
     },
     "keywords": {
       "name": "keyword.control",
-      "match": "(?i)\\b(si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|Tant(?:\\s+que)|Sinon(?:\\s+si)|ftant)\\b"
+      "match": "(?i)\\b(soit|si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|Tant(?:\\s+que)|Sinon(?:\\s+si)|ftant)\\b"
     },
     "logical-operators": {
       "name": "keyword.control",
@@ -106,7 +106,7 @@
     },
     "support-functions": {
       "name": "support.function",
-      "match": "(?i)\\b(longueur|concat|souschaîne|ième|chaineversentier|fichierouvrir|fichierfermer|fichierlire|fichierfin|fichiercreer|fichierecrire|comparaison|tete|val|suc|finliste|listevide|longueurliste|acces|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|change|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|estvide|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|table|domaine|domainetable|accestable|ajouttable|suppressiontable|changetable|estdans|écrire|lire)\\b"
+      "match": "(?i)\\b(longueur|concat|souschaîne|ième|chaineversentier|fichierouvrir|fichierfermer|fichierlire|fichierfin|fichiercreer|fichierecrire|comparaison|tete|val|suc|finliste|listevide|longueurliste|acces|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|change|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|estvide|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|table|domaine|domainetable|accestable|ajouttable|suppressiontable|changetable|estdans|racine|fg|fd|noeudvide|creerarb|créerarb|adjfg|adjfd|chgarb|supfg|supfd|arbrevide|pere|écrire|lire)\\b"
     },
     "storage": {
       "patterns": [
@@ -129,7 +129,7 @@
         },
         {
           "name": "storage.type",
-          "match": "(?i)\\b(entier|réel|reel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|listesym|table|ensemble|fichier|listesym|InOut)\\b(?!\\s*\\()"
+          "match": "(?i)\\b(entier|réel|reel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|listesym|table|ensemble|fichier|arbin|arbrebinaire|arbrebinaireentier|arbrebinairechaine|arbrebinairechaîne|arbrebinairebooleen|arbrebinairebooléen|arbrebinairereel|arbrebinaireréel|noeud|nœud|listesym|InOut)\\b(?!\\s*\\()"
         },
         {
           "name": "storage.type",
@@ -178,7 +178,7 @@
       ]
     },
     "function-call": {
-      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)(?=\\s*\\()",
+      "match": "(?i)\\b(?!(?:soit|si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)(?=\\s*\\()",
       "captures": {
         "1": {
           "name": "entity.name.function.call"
@@ -224,7 +224,7 @@
     },
     "variables": {
       "name": "variable.other",
-      "match": "(?i)\\b(?!(?:si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
+      "match": "(?i)\\b(?!(?:soit|si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
     }
   }
 }
