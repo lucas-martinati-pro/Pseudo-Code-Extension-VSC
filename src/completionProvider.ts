@@ -811,14 +811,18 @@ function isInCommentOrString(lineText: string, charPos: number): boolean {
 // PROVIDER DE HOVER (info au survol)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Mots-clés du langage avec leur description pour le hover (dérivés automatiquement de PSC_DEFINITIONS) */
+/** Mots-clés et types du langage avec leur description pour le hover (dérivés automatiquement de PSC_DEFINITIONS) */
 const KEYWORD_DOCS: Record<string, string> = {
     ...Object.fromEntries(
         PSC_DEFINITIONS.keywords
             .filter(k => k.description)
             .map(k => [k.name.toLowerCase(), k.description!])
     ),
-    'fin_ligne': '**FIN_LIGNE** — Constante de fin de ligne (\\n)'
+    ...Object.fromEntries(
+        PSC_DEFINITIONS.types
+            .flatMap(t => t.aliases.map(alias => [alias.toLowerCase(), t.description || `**${t.name}** *(type)*`]))
+    ),
+    'fin_ligne': '**FIN_LIGNE** — Constante de fin de ligne (`\\n`)'
 };
 
 export class PscHoverProvider implements vscode.HoverProvider {
@@ -844,7 +848,7 @@ export class PscHoverProvider implements vscode.HoverProvider {
             md.appendMarkdown(`**Catégorie :** ${builtin.category}\n\n`);
             md.appendCodeblock(builtin.signature, 'psc');
             if (builtin.description) {
-                md.appendMarkdown(`\n${builtin.description}`);
+                md.appendMarkdown(`\n\n${builtin.description}`);
             }
             return new vscode.Hover(md, wordRange);
         }
