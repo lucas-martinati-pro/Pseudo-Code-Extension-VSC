@@ -1,3 +1,32 @@
+# 🚀 Release v0.4.25 — PseudoCode Language Interpreter
+
+### ✨ Nouveautés Majeures : Support complet des ABR et AVL
+- **Nouveaux types :**
+  - `abr` — Arbre Binaire de Recherche (propriété BST : `fg ≤ noeud ≤ fd`, ordre lexicographique pour les chaînes).
+  - `avl` — Arbre AVL : ABR dynamiquement équilibré (`|h(fd) - h(fg)| ≤ 1`).
+- **Primitives ABR :**
+  - `abrVide()`, `creerABR(v)` / `créerABR(v)` : construction.
+  - `rechercheABR(abr, clé)` : renvoie la traduction (`anglais`) ou `""` si absent — O(h).
+  - `insertionABR(abr, v)` / `insertionABR(abr, mot, traduction)` : insertion BST (doublon → mise à jour).
+  - `suppressionABR(abr, clé)` : feuille / 1 fils / 2 fils via successeur.
+  - `estABR(A)` (Ex. 6) : validité via infixe trié, accepte `arbin`/`abr`/`avl`.
+  - `kemePlusPetit(abr, k)` (Ex. 7) : k-ième plus petite valeur (k ≥ 1, `nil` si hors bornes).
+- **Primitives AVL :**
+  - `avlVide()`, `creerAVL(v)` / `créerAVL(v)`, `insertionAVL`, `suppressionAVL` (insertion BST + remontée avec rotations O(1), garantie O(log n)).
+  - `estAVL(A)` : BST + équilibré partout.
+  - `hauteur(a[, n])` (vide=0, feuille=1 ; dégénéré trié [1..7] → h=7 vs équilibré h=3).
+  - `facteurEquilibre(a[, n]) = h(droit) - h(gauche)`.
+  - `rotationGauche / rotationDroite / rotationGaucheDroite / rotationDroiteGauche(a, n)` : réarrangements locaux O(1).
+- **Interpréteur & IntelliSense :**
+  - Helpers Lua BST/AVL avec maintien des parents et hauteurs, `racine/fg/fd/val` compatibles `abr`/`avl`, affichage `Abr(...)`/`Avl(...)` avec décodage `français`.
+  - Constructeurs `abr(v)` / `avl(v)`, normalisations (`abr vide`, `kème plus petit`, `facteur équilibre`...), complétion par point et hover synchronisés, grammaire TextMate régénérée (97 fonctions, 36 types).
+
+### 🧪 Tests & Démonstrations
+- Ajout de `examples/DEMO_ABR.psc` (lexique fr-ang, suppression, k-ième, dégénéré vs équilibré, `estABR` négatif) et `examples/DEMO_AVL.psc` (insertions triées 1..7 → `Avl(4(2(1,3),6(5,7)))` h=3, facteurs, rotations simples/doubles, suppressions rééquilibrées, lexique AVL).
+- Suite `npm test` : 7/7 fichiers validés (transpilation + `luac -p` + exécution Lua).
+
+---
+
 # 🚀 Release v0.4.24 — PseudoCode Language Interpreter
 
 ### ✨ Nouveautés Majeures : Support des Arbres Binaires (TDA)
