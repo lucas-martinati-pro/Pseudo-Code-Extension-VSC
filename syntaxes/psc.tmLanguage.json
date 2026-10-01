@@ -106,7 +106,7 @@
     },
     "support-functions": {
       "name": "support.function",
-      "match": "(?i)\\b(longueur|concat|souschaîne|ième|chaineversentier|fichierouvrir|fichierfermer|fichierlire|fichierfin|fichiercreer|fichierecrire|comparaison|tete|val|suc|finliste|listevide|longueurliste|acces|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|change|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|estvide|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|table|domaine|domainetable|accestable|ajouttable|suppressiontable|changetable|estdans|racine|fg|fd|noeudvide|creerarb|créerarb|adjfg|adjfd|chgarb|supfg|supfd|arbrevide|pere|écrire|lire)\\b"
+      "match": "(?i)\\b(longueur|concat|souschaîne|ième|chaineversentier|fichierouvrir|fichierfermer|fichierlire|fichierfin|fichiercreer|fichierecrire|comparaison|tete|val|suc|finliste|listevide|longueurliste|acces|ajoutteteliste|suppressionteteliste|ajoutqueueliste|suppressionqueueliste|ajoutliste|suppressionliste|changeliste|change|tetels|queuels|valls|sucls|precls|finls|videls|ajouttetels|suppressiontetels|ajoutqueuels|suppressionqueuels|ajoutls|suppressionls|changels|pilevide|sommet|estvidepile|empiler|depiler|estvide|filevide|estvidefile|enfiler|defiler|premier|ajoutfile|suppressionfile|estfilevide|tablevide|table|domaine|domainetable|accestable|ajouttable|suppressiontable|changetable|estdans|racine|fg|fd|noeudvide|creerarb|créerarb|adjfg|adjfd|chgarb|supfg|supfd|arbrevide|pere|abrvide|creerabr|créerabr|rechercheabr|insertionabr|suppressionabr|estabr|kemepluspetit|hauteur|avlvide|creeravl|créeravl|insertionavl|suppressionavl|estavl|facteurequilibre|rotationgauche|rotationdroite|rotationgauchedroite|rotationdroitegauche|écrire|lire)\\b"
     },
     "storage": {
       "patterns": [
@@ -129,7 +129,7 @@
         },
         {
           "name": "storage.type",
-          "match": "(?i)\\b(entier|réel|reel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|listesym|table|ensemble|fichier|arbin|arbrebinaire|arbrebinaireentier|arbrebinairechaine|arbrebinairechaîne|arbrebinairebooleen|arbrebinairebooléen|arbrebinairereel|arbrebinaireréel|noeud|nœud|listesym|InOut)\\b(?!\\s*\\()"
+          "match": "(?i)\\b(entier|réel|reel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|listesym|table|ensemble|fichier|arbin|arbrebinaire|arbrebinaireentier|arbrebinairechaine|arbrebinairechaîne|arbrebinairebooleen|arbrebinairebooléen|arbrebinairereel|arbrebinaireréel|noeud|nœud|abr|arbr|arbrebinairecherche|abrchaine|abrchaîne|abrentier|abrentiers|avl|arbreavl|avltree|listesym|InOut)\\b(?!\\s*\\()"
         },
         {
           "name": "storage.type",

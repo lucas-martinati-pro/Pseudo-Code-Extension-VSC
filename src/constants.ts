@@ -352,6 +352,20 @@ local function __psc_is_listesym(t)
     return false
 end
 
+-- Décode les identifiants encodés (fran_ccedil_ais -> français) pour un affichage lisible
+local function __psc_decode_key(k)
+    if type(k) ~= 'string' then return tostring(k) end
+    local s = k
+    s = s:gsub('_eacute_', 'é'):gsub('_egrave_', 'è'):gsub('_ecirc_', 'ê'):gsub('_euml_', 'ë')
+    s = s:gsub('_agrave_', 'à'):gsub('_acirc_', 'â'):gsub('_auml_', 'ä')
+    s = s:gsub('_icirc_', 'î'):gsub('_iuml_', 'ï')
+    s = s:gsub('_ocirc_', 'ô'):gsub('_ouml_', 'ö')
+    s = s:gsub('_ugrave_', 'ù'):gsub('_ucirc_', 'û'):gsub('_uuml_', 'ü')
+    s = s:gsub('_ccedil_', 'ç'):gsub('_oe_', 'œ'):gsub('_ae_', 'æ')
+    s = s:gsub('_Eacute_', 'É'):gsub('_Egrave_', 'È'):gsub('_Ccedil_', 'Ç')
+    return s
+end
+
 -- Sérialisation générique (incluant listes TDA au format (a, b, c))
 local function __psc_serialize(v)
     -- Gestion des valeurs nil (listes vides)
@@ -360,8 +374,8 @@ local function __psc_serialize(v)
     end
     
     if type(v) == 'table' then
-        -- Vérifier d'abord si c'est un Arbre Binaire ou un Noeud
-        if v._type == 'arbin' then
+        -- Vérifier d'abord si c'est un Arbre Binaire / ABR / AVL ou un Noeud
+        if v._type == 'arbin' or v._type == 'abr' or v._type == 'avl' then
             local function __psc_serialize_node(n)
                 if n == nil then return 'nil' end
                 if n.fg == nil and n.fd == nil then
@@ -369,10 +383,13 @@ local function __psc_serialize(v)
                 end
                 return __psc_serialize(n.val) .. '(' .. __psc_serialize_node(n.fg) .. ', ' .. __psc_serialize_node(n.fd) .. ')'
             end
+            local prefix = 'ArbreBin'
+            if v._type == 'abr' then prefix = 'Abr' end
+            if v._type == 'avl' then prefix = 'Avl' end
             if v.root == nil then
-                return 'ArbreBin(nil)'
+                return prefix .. '(nil)'
             end
-            return 'ArbreBin(' .. __psc_serialize_node(v.root) .. ')'
+            return prefix .. '(' .. __psc_serialize_node(v.root) .. ')'
         elseif v._type == 'noeud' then
             return 'Noeud(' .. __psc_serialize(v.val) .. ')'
         elseif v._type == 'pile' then
@@ -425,11 +442,27 @@ local function __psc_serialize(v)
             end
             return '[' .. table.concat(parts, ', ') .. ']'
         else
-            -- Objet/enregistrement générique (filtrer _type et _data internes)
+            -- Objet/enregistrement générique (filtrer _type et _data internes, ignorer alias encodés doublons)
             local parts = {}
+            local seen_decoded = {}
             for k, val in pairs(v) do
-                if k ~= '_type' and k ~= '_data' then
-                    parts[#parts+1] = tostring(k) .. ':' .. __psc_serialize(val)
+                if k ~= '_type' and k ~= '_data' and k ~= 'h' and k ~= 'parent' and k ~= 'fg' and k ~= 'fd' then
+                    local dk = __psc_decode_key(k)
+                    -- éviter d'afficher deux fois francais + français (alias insertionABR 3 args)
+                    if dk == 'français' and v.francais ~= nil then
+                        -- afficher une seule fois sous 'français'
+                        if not seen_decoded[dk] then
+                            parts[#parts+1] = dk .. ':' .. __psc_serialize(val)
+                            seen_decoded[dk] = true
+                        end
+                    elseif dk == 'francais' and v.fran_ccedil_ais ~= nil then
+                        -- skip : déjà affiché comme français
+                    else
+                        if not seen_decoded[dk] then
+                            parts[#parts+1] = dk .. ':' .. __psc_serialize(val)
+                            seen_decoded[dk] = true
+                        end
+                    end
                 end
             end
             return '{' .. table.concat(parts, ', ') .. '}'
@@ -531,11 +564,11 @@ local function __psc_liste_tete(l)
 end
 local function __psc_liste_val(l, p)
     if l == nil and p == nil then return nil end
-    -- Cas Arbre Binaire : val(arbre, noeud) ou val(noeud)
+    -- Cas Arbre Binaire / ABR / AVL : val(arbre, noeud) ou val(noeud)
     if type(p) == 'table' and p.val ~= nil then
         return p.val
     end
-    if type(l) == 'table' and l._type == 'arbin' then
+    if type(l) == 'table' and (l._type == 'arbin' or l._type == 'abr' or l._type == 'avl') then
         if type(p) == 'table' then return p.val end
         return nil
     end
@@ -1096,7 +1129,7 @@ local function __psc_arbin_vide(a)
     if a == nil then
         return { _type = 'arbin', root = nil }
     end
-    if type(a) == 'table' and a._type == 'arbin' then
+    if type(a) == 'table' and (a._type == 'arbin' or a._type == 'abr' or a._type == 'avl') then
         return a.root == nil
     end
     return a == nil
@@ -1105,7 +1138,7 @@ end
 local function __psc_arbin_racine(a)
     if a == nil then return nil end
     if type(a) == 'table' then
-        if a._type == 'arbin' then
+        if a._type == 'arbin' or a._type == 'abr' or a._type == 'avl' then
             return a.root
         end
         return a
@@ -1116,7 +1149,7 @@ end
 local function __psc_arbin_fg(a, n)
     if n == nil then
         if type(a) == 'table' then
-            if a._type == 'arbin' then
+            if a._type == 'arbin' or a._type == 'abr' or a._type == 'avl' then
                 return a.root and a.root.fg or nil
             end
             return a.fg
@@ -1124,7 +1157,7 @@ local function __psc_arbin_fg(a, n)
         return nil
     end
     if type(n) == 'table' then
-        if n._type == 'arbin' then
+        if n._type == 'arbin' or n._type == 'abr' or n._type == 'avl' then
             return n.root and n.root.fg or nil
         end
         return n.fg
@@ -1135,7 +1168,7 @@ end
 local function __psc_arbin_fd(a, n)
     if n == nil then
         if type(a) == 'table' then
-            if a._type == 'arbin' then
+            if a._type == 'arbin' or a._type == 'abr' or a._type == 'avl' then
                 return a.root and a.root.fd or nil
             end
             return a.fd
@@ -1143,7 +1176,7 @@ local function __psc_arbin_fd(a, n)
         return nil
     end
     if type(n) == 'table' then
-        if n._type == 'arbin' then
+        if n._type == 'arbin' or n._type == 'abr' or n._type == 'avl' then
             return n.root and n.root.fd or nil
         end
         return n.fd
@@ -1179,13 +1212,13 @@ end
 local function __psc_arbin_adjfg(a, n, v)
     if a == nil and n == nil then return end
     local target = n
-    if target == nil and type(a) == 'table' and a._type == 'arbin' then
+    if target == nil and type(a) == 'table' and (a._type == 'arbin' or a._type == 'abr' or a._type == 'avl') then
         if a.root == nil then
             a.root = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = nil }
             return a
         end
         target = a.root
-    elseif type(target) == 'table' and target._type == 'arbin' then
+    elseif type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
         target = target.root
     end
     if target ~= nil and type(target) == 'table' then
@@ -1197,13 +1230,13 @@ end
 local function __psc_arbin_adjfd(a, n, v)
     if a == nil and n == nil then return end
     local target = n
-    if target == nil and type(a) == 'table' and a._type == 'arbin' then
+    if target == nil and type(a) == 'table' and (a._type == 'arbin' or a._type == 'abr' or a._type == 'avl') then
         if a.root == nil then
             a.root = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = nil }
             return a
         end
         target = a.root
-    elseif type(target) == 'table' and target._type == 'arbin' then
+    elseif type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
         target = target.root
     end
     if target ~= nil and type(target) == 'table' then
@@ -1214,7 +1247,7 @@ end
 
 local function __psc_arbin_chgarb(a, n, v)
     local target = n
-    if type(target) == 'table' and target._type == 'arbin' then
+    if type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
         target = target.root
     end
     if target ~= nil and type(target) == 'table' then
@@ -1225,7 +1258,7 @@ end
 
 local function __psc_arbin_supfg(a, n)
     local target = n
-    if type(target) == 'table' and target._type == 'arbin' then
+    if type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
         target = target.root
     end
     if target ~= nil and type(target) == 'table' then
@@ -1236,7 +1269,7 @@ end
 
 local function __psc_arbin_supfd(a, n)
     local target = n
-    if type(target) == 'table' and target._type == 'arbin' then
+    if type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
         target = target.root
     end
     if target ~= nil and type(target) == 'table' then
@@ -1260,6 +1293,574 @@ local supfg = __psc_arbin_supfg
 local supfd = __psc_arbin_supfd
 local arbrevide = __psc_arbin_vide
 local arbreVide = __psc_arbin_vide
+
+-- =================================================================================================================
+-- ABR — Arbres Binaires de Recherche (propriété BST : fg <= noeud <= fd)
+-- Lexique français-anglais : Lexique = arbin(MotTraduction = <français, anglais>)
+-- =================================================================================================================
+function __psc_tree_root(a)
+    if a == nil then return nil end
+    if type(a) == 'table' and (a._type == 'arbin' or a._type == 'abr' or a._type == 'avl') then
+        return a.root
+    end
+    return a
+end
+
+function __psc_abr_cle(v)
+    if type(v) ~= 'table' then return v end
+    if v.francais ~= nil then return v.francais end
+    if v.fran_ccedil_ais ~= nil then return v.fran_ccedil_ais end
+    if v.cle ~= nil then return v.cle end
+    if v.cl_eacute_ ~= nil then return v.cl_eacute_ end
+    if v.key ~= nil then return v.key end
+    if v.anglais ~= nil then
+        for k, val in pairs(v) do
+            if k ~= 'anglais' and k ~= '_type' and k ~= '_data' then return val end
+        end
+    end
+    if v.traduction ~= nil then
+        for k, val in pairs(v) do
+            if k ~= 'traduction' and k ~= '_type' and k ~= '_data' then return val end
+        end
+    end
+    if v.valeur ~= nil and v.cle == nil then
+        -- table générique {cle?, valeur?} : si pas de cle, chercher l'autre champ
+        local other = nil
+        for k, val in pairs(v) do
+            if k ~= 'valeur' and k ~= '_type' and k ~= '_data' then other = val break end
+        end
+        if other ~= nil then return other end
+    end
+    return v
+end
+
+function __psc_abr_valeur(v)
+    if type(v) ~= 'table' then return v end
+    if v.anglais ~= nil then return v.anglais end
+    if v.traduction ~= nil then return v.traduction end
+    if v.valeur ~= nil then return v.valeur end
+    if v.value ~= nil then return v.value end
+    return v
+end
+
+function __psc_abr_compare(k1, k2)
+    local a = __psc_abr_cle(k1)
+    local b = __psc_abr_cle(k2)
+    if a == b then return 0 end
+    if type(a) == 'number' and type(b) == 'number' then
+        if a < b then return -1 else return 1 end
+    end
+    if type(a) == 'string' and type(b) == 'string' then
+        if a < b then return -1 else return 1 end
+    end
+    local sa = tostring(a)
+    local sb = tostring(b)
+    if sa == sb then return 0 end
+    if sa < sb then return -1 else return 1 end
+end
+
+function __psc_abr_nouveau_noeud(v, parent)
+    return { _type = 'noeud', val = v, fg = nil, fd = nil, parent = parent }
+end
+
+function __psc_abr_vide()
+    return { _type = 'abr', root = nil }
+end
+
+function __psc_abr_creer(v)
+    if v == nil then return { _type = 'abr', root = nil } end
+    return { _type = 'abr', root = __psc_abr_nouveau_noeud(v, nil) }
+end
+
+function __psc_abr_recherche(a, cle)
+    local cur = __psc_tree_root(a)
+    while cur ~= nil do
+        local c = __psc_abr_compare(cle, cur.val)
+        if c == 0 then
+            return __psc_abr_valeur(cur.val)
+        elseif c < 0 then
+            cur = cur.fg
+        else
+            cur = cur.fd
+        end
+    end
+    return ""
+end
+
+function __psc_abr_construire_valeur(v1, v2)
+    if v2 == nil then return v1 end
+    local nv = __psc_create_composite({ francais = v1, anglais = v2 })
+    nv.fran_ccedil_ais = v1
+    return nv
+end
+
+function __psc_abr_insertion(a, v1, v2)
+    if a == nil then return nil end
+    if type(a) ~= 'table' or (a._type ~= 'abr' and a._type ~= 'arbin' and a._type ~= 'avl') then return a end
+    local newVal = __psc_abr_construire_valeur(v1, v2)
+    if a.root == nil then
+        a.root = __psc_abr_nouveau_noeud(newVal, nil)
+        return a
+    end
+    local cur = a.root
+    while true do
+        local c = __psc_abr_compare(newVal, cur.val)
+        if c < 0 then
+            if cur.fg == nil then
+                cur.fg = __psc_abr_nouveau_noeud(newVal, cur)
+                break
+            else
+                cur = cur.fg
+            end
+        elseif c > 0 then
+            if cur.fd == nil then
+                cur.fd = __psc_abr_nouveau_noeud(newVal, cur)
+                break
+            else
+                cur = cur.fd
+            end
+        else
+            cur.val = newVal
+            break
+        end
+    end
+    return a
+end
+
+function __psc_abr_min_noeud(n)
+    local cur = n
+    while cur ~= nil and cur.fg ~= nil do cur = cur.fg end
+    return cur
+end
+
+function __psc_abr_suppression(a, cle)
+    if a == nil then return nil end
+    if type(a) ~= 'table' or (a._type ~= 'abr' and a._type ~= 'arbin' and a._type ~= 'avl') then return a end
+    local cur = a.root
+    while cur ~= nil and __psc_abr_compare(cle, cur.val) ~= 0 do
+        if __psc_abr_compare(cle, cur.val) < 0 then cur = cur.fg else cur = cur.fd end
+    end
+    if cur == nil then return a end
+    local function __psc_transplante(arbre, u, v)
+        local p = u.parent
+        if p == nil then
+            arbre.root = v
+        elseif p.fg == u then
+            p.fg = v
+        else
+            p.fd = v
+        end
+        if v ~= nil then v.parent = p end
+    end
+    if cur.fg == nil then
+        __psc_transplante(a, cur, cur.fd)
+    elseif cur.fd == nil then
+        __psc_transplante(a, cur, cur.fg)
+    else
+        local suc = __psc_abr_min_noeud(cur.fd)
+        if suc.parent ~= cur then
+            __psc_transplante(a, suc, suc.fd)
+            suc.fd = cur.fd
+            if suc.fd ~= nil then suc.fd.parent = suc end
+        end
+        __psc_transplante(a, cur, suc)
+        suc.fg = cur.fg
+        if suc.fg ~= nil then suc.fg.parent = suc end
+    end
+    return a
+end
+
+function __psc_abr_est(a)
+    local root = __psc_tree_root(a)
+    if root == nil then return true end
+    local prev = nil
+    local prevSet = false
+    local ok = true
+    local function __psc_infixe(n)
+        if n == nil or not ok then return end
+        __psc_infixe(n.fg)
+        if not ok then return end
+        local k = __psc_abr_cle(n.val)
+        if prevSet then
+            if __psc_abr_compare(prev, k) > 0 then ok = false return end
+        end
+        prev = k
+        prevSet = true
+        __psc_infixe(n.fd)
+    end
+    __psc_infixe(root)
+    return ok
+end
+
+function __psc_abr_keme(a, k)
+    if k == nil or type(k) ~= 'number' or k < 1 then return nil end
+    local root = __psc_tree_root(a)
+    local count = 0
+    local found = nil
+    local done = false
+    local function __psc_infixe_k(n)
+        if n == nil or done then return end
+        __psc_infixe_k(n.fg)
+        if done then return end
+        count = count + 1
+        if count == k then found = n.val done = true return end
+        __psc_infixe_k(n.fd)
+    end
+    __psc_infixe_k(root)
+    return found
+end
+
+function __psc_hauteur_noeud(n)
+    if n == nil then return 0 end
+    local hg = __psc_hauteur_noeud(n.fg)
+    local hd = __psc_hauteur_noeud(n.fd)
+    if hg > hd then return hg + 1 else return hd + 1 end
+end
+
+function __psc_hauteur(a, n)
+    if n ~= nil then
+        if type(n) == 'table' and (n._type == 'arbin' or n._type == 'abr' or n._type == 'avl') then
+            return __psc_hauteur_noeud(n.root)
+        end
+        return __psc_hauteur_noeud(n)
+    end
+    if a == nil then return 0 end
+    if type(a) == 'table' and (a._type == 'arbin' or a._type == 'abr' or a._type == 'avl') then
+        return __psc_hauteur_noeud(a.root)
+    end
+    return __psc_hauteur_noeud(a)
+end
+
+-- =================================================================================================================
+-- AVL — Arbres équilibrés dynamiquement (|hd - hg| <= 1, rotations O(1))
+-- =================================================================================================================
+function __psc_avl_vide()
+    return { _type = 'avl', root = nil }
+end
+
+function __psc_avl_creer(v)
+    if v == nil then return { _type = 'avl', root = nil } end
+    return { _type = 'avl', root = { _type = 'noeud', val = v, fg = nil, fd = nil, parent = nil, h = 1 } }
+end
+
+function __psc_avl_h(n)
+    if n == nil then return 0 end
+    if n.h ~= nil then return n.h end
+    return __psc_hauteur_noeud(n)
+end
+
+function __psc_avl_maj(n)
+    if n == nil then return end
+    local hg = __psc_avl_h(n.fg)
+    local hd = __psc_avl_h(n.fd)
+    if hg > hd then n.h = hg + 1 else n.h = hd + 1 end
+end
+
+function __psc_avl_facteur_interne(n)
+    if n == nil then return 0 end
+    return __psc_avl_h(n.fd) - __psc_avl_h(n.fg)
+end
+
+function __psc_avl_facteur(a, n)
+    local target = nil
+    if n ~= nil then
+        if type(n) == 'table' and (n._type == 'arbin' or n._type == 'abr' or n._type == 'avl') then
+            target = n.root
+        else
+            target = n
+        end
+    else
+        target = __psc_tree_root(a)
+        if target == nil and type(a) == 'table' and a.val ~= nil then target = a end
+    end
+    if target == nil then return 0 end
+    return __psc_avl_facteur_interne(target)
+end
+
+function __psc_avl_rotate_left(a, G)
+    if G == nil then return end
+    local P = G.fd
+    if P == nil then return end
+    local B = P.fg
+    local gp = G.parent
+    P.parent = gp
+    if gp == nil then
+        a.root = P
+    elseif gp.fg == G then
+        gp.fg = P
+    else
+        gp.fd = P
+    end
+    P.fg = G
+    G.parent = P
+    G.fd = B
+    if B ~= nil then B.parent = G end
+    __psc_avl_maj(G)
+    __psc_avl_maj(P)
+end
+
+function __psc_avl_rotate_right(a, G)
+    if G == nil then return end
+    local P = G.fg
+    if P == nil then return end
+    local B = P.fd
+    local gp = G.parent
+    P.parent = gp
+    if gp == nil then
+        a.root = P
+    elseif gp.fg == G then
+        gp.fg = P
+    else
+        gp.fd = P
+    end
+    P.fd = G
+    G.parent = P
+    G.fg = B
+    if B ~= nil then B.parent = G end
+    __psc_avl_maj(G)
+    __psc_avl_maj(P)
+end
+
+function __psc_avl_reequilibrer(a, u)
+    if u == nil then return end
+    local bal = __psc_avl_facteur_interne(u)
+    if bal > 1 then
+        local rc = u.fd
+        local bf = __psc_avl_facteur_interne(rc)
+        if bf >= 0 then
+            __psc_avl_rotate_left(a, u)
+        else
+            __psc_avl_rotate_right(a, rc)
+            __psc_avl_rotate_left(a, u)
+        end
+    elseif bal < -1 then
+        local lc = u.fg
+        local bf = __psc_avl_facteur_interne(lc)
+        if bf <= 0 then
+            __psc_avl_rotate_right(a, u)
+        else
+            __psc_avl_rotate_left(a, lc)
+            __psc_avl_rotate_right(a, u)
+        end
+    end
+end
+
+function __psc_avl_rotation_gauche(a, n)
+    local target = n
+    if type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
+        target = target.root
+    end
+    __psc_avl_rotate_left(a, target)
+    return a
+end
+
+function __psc_avl_rotation_droite(a, n)
+    local target = n
+    if type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
+        target = target.root
+    end
+    __psc_avl_rotate_right(a, target)
+    return a
+end
+
+function __psc_avl_rotation_gd(a, n)
+    local target = n
+    if type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
+        target = target.root
+    end
+    if target == nil or target.fg == nil then return a end
+    __psc_avl_rotate_left(a, target.fg)
+    __psc_avl_rotate_right(a, target)
+    return a
+end
+
+function __psc_avl_rotation_dg(a, n)
+    local target = n
+    if type(target) == 'table' and (target._type == 'arbin' or target._type == 'abr' or target._type == 'avl') then
+        target = target.root
+    end
+    if target == nil or target.fd == nil then return a end
+    __psc_avl_rotate_right(a, target.fd)
+    __psc_avl_rotate_left(a, target)
+    return a
+end
+
+function __psc_avl_nouveau_noeud(v, parent)
+    return { _type = 'noeud', val = v, fg = nil, fd = nil, parent = parent, h = 1 }
+end
+
+function __psc_avl_insertion(a, v1, v2)
+    if a == nil then return nil end
+    if type(a) ~= 'table' or (a._type ~= 'avl' and a._type ~= 'abr' and a._type ~= 'arbin') then return a end
+    local newVal = __psc_abr_construire_valeur(v1, v2)
+    if a.root == nil then
+        a.root = __psc_avl_nouveau_noeud(newVal, nil)
+        return a
+    end
+    local cur = a.root
+    local path = {}
+    while true do
+        table.insert(path, cur)
+        local c = __psc_abr_compare(newVal, cur.val)
+        if c < 0 then
+            if cur.fg == nil then
+                cur.fg = __psc_avl_nouveau_noeud(newVal, cur)
+                table.insert(path, cur.fg)
+                break
+            else
+                cur = cur.fg
+            end
+        elseif c > 0 then
+            if cur.fd == nil then
+                cur.fd = __psc_avl_nouveau_noeud(newVal, cur)
+                table.insert(path, cur.fd)
+                break
+            else
+                cur = cur.fd
+            end
+        else
+            cur.val = newVal
+            return a
+        end
+    end
+    for i = #path - 1, 1, -1 do
+        local u = path[i]
+        __psc_avl_maj(u)
+        local before_h = u.h
+        __psc_avl_reequilibrer(a, u)
+        __psc_avl_maj(u)
+        -- continuer la remontée même après rotation (hauteurs parents à jour)
+    end
+    return a
+end
+
+function __psc_avl_suppression(a, cle)
+    if a == nil then return nil end
+    if type(a) ~= 'table' or (a._type ~= 'avl' and a._type ~= 'abr' and a._type ~= 'arbin') then return a end
+    if a.root == nil then return a end
+    -- 1. Rechercher le noeud + chemin des ancêtres
+    local cur = a.root
+    local path = {}
+    while cur ~= nil and __psc_abr_compare(cle, cur.val) ~= 0 do
+        table.insert(path, cur)
+        if __psc_abr_compare(cle, cur.val) < 0 then cur = cur.fg else cur = cur.fd end
+    end
+    if cur == nil then return a end
+    local function __psc_transplante_avl(arbre, u, v)
+        local p = u.parent
+        if p == nil then
+            arbre.root = v
+        elseif p.fg == u then
+            p.fg = v
+        else
+            p.fd = v
+        end
+        if v ~= nil then v.parent = p end
+    end
+    local rebalance_from = nil
+    if cur.fg == nil then
+        rebalance_from = cur.parent
+        __psc_transplante_avl(a, cur, cur.fd)
+        if cur.fd ~= nil and cur.fd.h == nil then cur.fd.h = 1 end
+    elseif cur.fd == nil then
+        rebalance_from = cur.parent
+        __psc_transplante_avl(a, cur, cur.fg)
+    else
+        -- deux fils : successeur = min(fd)
+        local suc = cur.fd
+        local sucPath = { cur }
+        while suc.fg ~= nil do
+            table.insert(sucPath, suc)
+            suc = suc.fg
+        end
+        cur.val = suc.val
+        -- supprimer suc (au plus un fils droit)
+        local sp = suc.parent
+        __psc_transplante_avl(a, suc, suc.fd)
+        -- chemin de rééquilibrage : ancêtres de suc + ancêtres de cur
+        for i = #sucPath, 1, -1 do table.insert(path, sucPath[i]) end
+        -- dédupliquer : reconstruire le chemin réel depuis la racine vers sp
+        -- plus simple : collecter tous les ancêtres de sp en remontant
+        local anc = {}
+        local t = sp
+        -- sp peut avoir été détaché ? sp reste valide (parent de l'ancien suc)
+        -- remonter jusqu'à la racine
+        while t ~= nil do
+            table.insert(anc, 1, t)
+            t = t.parent
+        end
+        -- rééquilibrer de bas en haut
+        for i = #anc, 1, -1 do
+            __psc_avl_maj(anc[i])
+            __psc_avl_reequilibrer(a, anc[i])
+            __psc_avl_maj(anc[i])
+        end
+        -- puis remonter les anciens ancêtres de cur (au-dessus de cur)
+        for i = #path, 1, -1 do
+            local u = path[i]
+            -- vérifier que u est toujours dans l'arbre (parent chain valide)
+            __psc_avl_maj(u)
+            __psc_avl_reequilibrer(a, u)
+            __psc_avl_maj(u)
+        end
+        return a
+    end
+    -- cas 0/1 fils : remonter depuis le parent
+    local t = rebalance_from
+    local anc2 = {}
+    while t ~= nil do
+        table.insert(anc2, 1, t)
+        t = t.parent
+    end
+    for i = #anc2, 1, -1 do
+        __psc_avl_maj(anc2[i])
+        __psc_avl_reequilibrer(a, anc2[i])
+        __psc_avl_maj(anc2[i])
+    end
+    -- aussi les ancêtres stockés dans path (redondant mais sûr)
+    for i = #path, 1, -1 do
+        local u = path[i]
+        __psc_avl_maj(u)
+        __psc_avl_reequilibrer(a, u)
+        __psc_avl_maj(u)
+    end
+    return a
+end
+
+function __psc_avl_est(a)
+    if not __psc_abr_est(a) then return false end
+    local root = __psc_tree_root(a)
+    if root == nil then return true end
+    local ok = true
+    local function __psc_check(n)
+        if n == nil or not ok then return end
+        local b = __psc_avl_facteur_interne(n)
+        if b < -1 or b > 1 then ok = false return end
+        __psc_check(n.fg)
+        __psc_check(n.fd)
+    end
+    __psc_check(root)
+    return ok
+end
+
+abrVide = __psc_abr_vide
+creerABR = __psc_abr_creer
+rechercheABR = __psc_abr_recherche
+insertionABR = __psc_abr_insertion
+suppressionABR = __psc_abr_suppression
+estABR = __psc_abr_est
+kemePlusPetit = __psc_abr_keme
+hauteur = __psc_hauteur
+avlVide = __psc_avl_vide
+creerAVL = __psc_avl_creer
+insertionAVL = __psc_avl_insertion
+suppressionAVL = __psc_avl_suppression
+estAVL = __psc_avl_est
+facteurEquilibre = __psc_avl_facteur
+rotationGauche = __psc_avl_rotation_gauche
+rotationDroite = __psc_avl_rotation_droite
+rotationGaucheDroite = __psc_avl_rotation_gd
+rotationDroiteGauche = __psc_avl_rotation_dg
 
 -- =================================================================================================================
 -- =================================================================================================================

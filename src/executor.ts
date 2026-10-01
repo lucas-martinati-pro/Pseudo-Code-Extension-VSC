@@ -498,8 +498,20 @@ export function transpileToLua(pscCode: string): string {
                 .replace(/\bd[eé]filer\b/giu, 'defiler')
                 .replace(/\bcr[eé]er\s*arb\b/giu, 'creerarb')
                 .replace(/\bcr[eé]er\s*arbre\b/giu, 'creerarb')
+                .replace(/\bcr[eé]er\s*abr\b/giu, 'creerabr')
+                .replace(/\bcr[eé]er\s*avl\b/giu, 'creeravl')
                 .replace(/\barbre\s*vide\b/giu, 'arbrevide')
-                .replace(/\bnoeud\s*vide\b/giu, 'noeudvide');
+                .replace(/\babr\s*vide\b/giu, 'abrvide')
+                .replace(/\bavl\s*vide\b/giu, 'avlvide')
+                .replace(/\bnoeud\s*vide\b/giu, 'noeudvide')
+                .replace(/\bk[ée]me\s*plus\s*petit\b/giu, 'kemepluspetit')
+                .replace(/\bfacteur\s*[ée]quilibre\b/giu, 'facteurequilibre')
+                .replace(/\brotation\s*gauche\s*droite\b/giu, 'rotationgauchedroite')
+                .replace(/\brotation\s*droite\s*gauche\b/giu, 'rotationdroitegauche')
+                .replace(/\brotation\s*gauche\b/giu, 'rotationgauche')
+                .replace(/\brotation\s*droite\b/giu, 'rotationdroite')
+                .replace(/\best\s*abr\b/giu, 'estabr')
+                .replace(/\best\s*avl\b/giu, 'estavl');
 
             if (REGEX_FONCTION.test(trimmedLine)) {
                 const funcNameMatch = REGEX_FONCTION_NAME.exec(trimmedLine);
@@ -709,6 +721,48 @@ export function transpileToLua(pscCode: string): string {
                         const after = trimmedLine.slice(closeIdx + 1);
                         trimmedLine = before + `__psc_arbin_creer(${args})` + after;
                         arbinRegex.lastIndex = 0;
+                    }
+                }
+            }
+
+            // 7. abr(val) → constructeur ABR (ne pas confondre avec arbin : \b strict)
+            {
+                const abrRegex = /\babr\s*\(/gi;
+                let abrMatch;
+                while ((abrMatch = abrRegex.exec(trimmedLine)) !== null) {
+                    const beforeMatch = trimmedLine.slice(0, abrMatch.index);
+                    if (/:\s*$/.test(beforeMatch)) {
+                        break;
+                    }
+                    const openIdx = abrMatch.index + abrMatch[0].length - 1;
+                    const closeIdx = findMatchingParen(trimmedLine, openIdx);
+                    if (closeIdx !== -1) {
+                        const args = trimmedLine.slice(openIdx + 1, closeIdx);
+                        const before = trimmedLine.slice(0, abrMatch.index);
+                        const after = trimmedLine.slice(closeIdx + 1);
+                        trimmedLine = before + `__psc_abr_creer(${args})` + after;
+                        abrRegex.lastIndex = 0;
+                    }
+                }
+            }
+
+            // 8. avl(val) → constructeur AVL
+            {
+                const avlRegex = /\bavl\s*\(/gi;
+                let avlMatch;
+                while ((avlMatch = avlRegex.exec(trimmedLine)) !== null) {
+                    const beforeMatch = trimmedLine.slice(0, avlMatch.index);
+                    if (/:\s*$/.test(beforeMatch)) {
+                        break;
+                    }
+                    const openIdx = avlMatch.index + avlMatch[0].length - 1;
+                    const closeIdx = findMatchingParen(trimmedLine, openIdx);
+                    if (closeIdx !== -1) {
+                        const args = trimmedLine.slice(openIdx + 1, closeIdx);
+                        const before = trimmedLine.slice(0, avlMatch.index);
+                        const after = trimmedLine.slice(closeIdx + 1);
+                        trimmedLine = before + `__psc_avl_creer(${args})` + after;
+                        avlRegex.lastIndex = 0;
                     }
                 }
             }

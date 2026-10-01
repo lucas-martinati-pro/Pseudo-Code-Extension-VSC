@@ -116,6 +116,16 @@ export const PSC_DEFINITIONS = {
             name: 'noeud',
             aliases: ['noeud', 'nœud'],
             description: '**noeud** — Référence opaque vers un nœud au sein d\'un arbre binaire (ou `nil` si absent).\n\n```psc\nn : Noeud\nn ← racine(arbre)\n```'
+        },
+        {
+            name: 'abr',
+            aliases: ['abr', 'arbr', 'arbrebinairecherche', 'abrchaine', 'abrchaîne', 'abrentier', 'abrentiers'],
+            description: '**abr[T]** — Arbre Binaire de Recherche : arbre binaire ordonné tel que pour tout nœud de valeur k, sous-arbre gauche ≤ k ≤ sous-arbre droit.\n\n```psc\nSoit Lexique = arbin[MotTraduction]\nlex ← abrVide()\ninsertionABR(lex, "chat", "cat")\n```\n> ⚠️ **Propriété BST :** `valeur(fils gauche) ≤ valeur(nœud) ≤ valeur(fils droit)` (ordre lexicographique pour les chaînes). Hauteur idéale `h ≈ log2(n)` → O(log n), dégénéré trié → O(n).'
+        },
+        {
+            name: 'avl',
+            aliases: ['avl', 'arbreavl', 'avltree'],
+            description: '**avl[T]** — Arbre AVL : ABR dynamiquement équilibré avec |hauteur(droit) - hauteur(gauche)| ≤ 1 en tout nœud (rotations O(1)).\n\n```psc\navl ← avlVide()\ninsertionAVL(avl, 10)\n```\n> 💡 **Garantie :** recherche, insertion et suppression strictement en O(log n) dans le pire des cas.'
         }
     ] as PscType[],
 
@@ -1161,6 +1171,224 @@ export const PSC_DEFINITIONS = {
             methodSnippet: 'pere(${VAR}, ${1:n})',
             category: 'Arbre Binaire',
             targetType: ['arbin', 'arbrebinaire', 'noeud']
+        },
+
+        // ═══════════ ABR — Arbres Binaires de Recherche ═══════════
+        {
+            name: 'abrvide',
+            arity: 0,
+            luaHelper: '__psc_abr_vide',
+            description: 'Crée un Arbre Binaire de Recherche vide.\n\n```psc\nlex ← abrVide()\n```\n> 💡 **Lexique français-anglais :** `Lexique = arbin(MotTraduction = <français, anglais>)` avec ordre lexicographique.',
+            signature: 'abrVide() : ABR',
+            snippet: 'abrVide()',
+            category: 'ABR',
+            targetType: ['abr', 'arbin']
+        },
+        {
+            name: 'creerabr',
+            arity: [0, 1],
+            luaHelper: '__psc_abr_creer',
+            description: 'Crée un ABR dont la racine contient `v` (ou vide si omis).\n\n```psc\nabr ← creerABR(10)\n```',
+            signature: 'creerABR([v]) : ABR',
+            snippet: 'creerABR(${1:v})',
+            category: 'ABR',
+            targetType: ['abr', 'arbin']
+        },
+        {
+            name: 'créerabr',
+            arity: [0, 1],
+            luaHelper: '__psc_abr_creer',
+            description: 'Variante accentuée de `creerABR`.\n\n```psc\nabr ← créerABR(10)\n```',
+            signature: 'créerABR([v]) : ABR',
+            snippet: 'créerABR(${1:v})',
+            category: 'ABR',
+            targetType: ['abr', 'arbin']
+        },
+        {
+            name: 'rechercheabr',
+            arity: 2,
+            luaHelper: '__psc_abr_recherche',
+            description: 'Recherche un mot/clé dans l\'ABR. Renvoie la traduction (champ `anglais`) ou la valeur trouvée, ou `""` (chaîne vide) si absent.\n\n```psc\ntrad ← rechercheABR(lex, "chat") // "cat" ou ""\nSi trad ≠ "" Alors :\n\técrire("Trouvé : ", trad)\nfsi\n```\n> ⚠️ **Complexité :** O(h), O(log n) si équilibré, O(n) si dégénéré.',
+            signature: 'rechercheABR(abr : ABR, clé) : valeur',
+            snippet: 'rechercheABR(${1:abr}, ${2:clé})',
+            methodSnippet: 'rechercheABR(${VAR}, ${1:clé})',
+            category: 'ABR',
+            targetType: ['abr', 'arbin', 'avl']
+        },
+        {
+            name: 'insertionabr',
+            arity: [2, 3],
+            luaHelper: '__psc_abr_insertion',
+            description: 'Insère une valeur dans l\'ABR en préservant la propriété BST (gauche ≤ nœud ≤ droite). 2 formes : `insertionABR(abr, v)` ou lexique `insertionABR(abr, mot, traduction)`.\n\n```psc\ninsertionABR(abr, 15)\ninsertionABR(lex, "chat", "cat") // crée <français="chat", anglais="cat">\n```\n> ⚠️ **Préconditions :** mot supposé absent, lexique supposé non vide (sinon racine créée). Doublon → mise à jour de la valeur.',
+            signature: 'insertionABR(abr : ABR, v [, traduction])',
+            snippet: 'insertionABR(${1:abr}, ${2:v})',
+            methodSnippet: 'insertionABR(${VAR}, ${1:v})',
+            category: 'ABR',
+            targetType: ['abr', 'arbin']
+        },
+        {
+            name: 'suppressionabr',
+            arity: 2,
+            luaHelper: '__psc_abr_suppression',
+            description: 'Supprime un mot/clé de l\'ABR en préservant la structure de recherche (feuille / 1 fils / 2 fils via successeur).\n\n```psc\nsuppressionABR(lex, "chat")\n```',
+            signature: 'suppressionABR(abr : ABR, clé)',
+            snippet: 'suppressionABR(${1:abr}, ${2:clé})',
+            methodSnippet: 'suppressionABR(${VAR}, ${1:clé})',
+            category: 'ABR',
+            targetType: ['abr', 'arbin']
+        },
+        {
+            name: 'estabr',
+            arity: 1,
+            luaHelper: '__psc_abr_est',
+            description: 'Exercice 6 — Vérifie si un arbre binaire quelconque est un ABR valide (parcours infixe trié croissant).\n\n```psc\nSi estABR(monArbre) Alors :\n\técrire("Valide")\nfsi\n```',
+            signature: 'estABR(A : ArbreBinaire) : booléen',
+            snippet: 'estABR(${1:A})',
+            methodSnippet: 'estABR(${VAR})',
+            category: 'ABR',
+            targetType: ['abr', 'arbin', 'avl', 'noeud']
+        },
+        {
+            name: 'kemepluspetit',
+            arity: 2,
+            luaHelper: '__psc_abr_keme',
+            description: 'Exercice 7 — Renvoie la k-ième plus petite valeur de l\'ABR (k ≥ 1, parcours infixe).\n\n```psc\ntroisieme ← kemePlusPetit(abr, 3)\n```\n> ⚠️ **Précondition :** `1 ≤ k ≤ taille`. Renvoie `nil` si hors bornes.',
+            signature: 'kemePlusPetit(abr : ABR, k : entier) : valeur',
+            snippet: 'kemePlusPetit(${1:abr}, ${2:k})',
+            methodSnippet: 'kemePlusPetit(${VAR}, ${1:k})',
+            category: 'ABR',
+            targetType: ['abr', 'arbin', 'avl']
+        },
+        {
+            name: 'hauteur',
+            arity: [1, 2],
+            luaHelper: '__psc_hauteur',
+            description: 'Hauteur d\'un arbre (vide = 0, feuille = 1). `hauteur(a)` ou `hauteur(a, n)` pour un sous-arbre. Idéal touffu : h ≈ log2(n).\n\n```psc\nh ← hauteur(avl)\nSi h > 10 Alors :\n\técrire("Déséquilibré ?")\nfsi\n```\n> 💡 **Dégénéré trié [1..7] :** h = n-1 → recherche O(n).',
+            signature: 'hauteur(a [, n : Noeud]) : entier',
+            snippet: 'hauteur(${1:a})',
+            methodSnippet: 'hauteur(${VAR})',
+            category: 'AVL',
+            targetType: ['abr', 'arbin', 'avl', 'noeud']
+        },
+
+        // ═══════════ AVL — Arbres équilibrés dynamiquement ═══════════
+        {
+            name: 'avlvide',
+            arity: 0,
+            luaHelper: '__psc_avl_vide',
+            description: 'Crée un arbre AVL vide (ABR équilibré).\n\n```psc\navl ← avlVide()\n```',
+            signature: 'avlVide() : AVL',
+            snippet: 'avlVide()',
+            category: 'AVL',
+            targetType: ['avl', 'abr', 'arbin']
+        },
+        {
+            name: 'creeravl',
+            arity: [0, 1],
+            luaHelper: '__psc_avl_creer',
+            description: 'Crée un AVL dont la racine contient `v` (ou vide si omis).\n\n```psc\navl ← creerAVL(10)\n```',
+            signature: 'creerAVL([v]) : AVL',
+            snippet: 'creerAVL(${1:v})',
+            category: 'AVL',
+            targetType: ['avl', 'abr']
+        },
+        {
+            name: 'créeravl',
+            arity: [0, 1],
+            luaHelper: '__psc_avl_creer',
+            description: 'Variante accentuée de `creerAVL`.',
+            signature: 'créerAVL([v]) : AVL',
+            snippet: 'créerAVL(${1:v})',
+            category: 'AVL',
+            targetType: ['avl', 'abr']
+        },
+        {
+            name: 'insertionavl',
+            arity: [2, 3],
+            luaHelper: '__psc_avl_insertion',
+            description: 'Insertion AVL en 2 étapes : insertion ABR normale puis remontée vers la racine (mise à jour hauteurs + rotations O(1)). Garantit O(log n).\n\n```psc\ninsertionAVL(avl, 15)\ninsertionAVL(lexAVL, "chat", "cat")\n```',
+            signature: 'insertionAVL(avl : AVL, v [, traduction])',
+            snippet: 'insertionAVL(${1:avl}, ${2:v})',
+            methodSnippet: 'insertionAVL(${VAR}, ${1:v})',
+            category: 'AVL',
+            targetType: ['avl', 'abr']
+        },
+        {
+            name: 'suppressionavl',
+            arity: 2,
+            luaHelper: '__psc_avl_suppression',
+            description: 'Suppression AVL : suppression ABR puis rééquilibrage remontant (rotations). Reste en O(log n).\n\n```psc\nsuppressionAVL(avl, 15)\n```',
+            signature: 'suppressionAVL(avl : AVL, clé)',
+            snippet: 'suppressionAVL(${1:avl}, ${2:clé})',
+            methodSnippet: 'suppressionAVL(${VAR}, ${1:clé})',
+            category: 'AVL',
+            targetType: ['avl', 'abr']
+        },
+        {
+            name: 'estavl',
+            arity: 1,
+            luaHelper: '__psc_avl_est',
+            description: 'Vérifie qu\'un arbre est un AVL valide : est un ABR ET |hauteur(droit)-hauteur(gauche)| ≤ 1 en tout nœud.\n\n```psc\nSi estAVL(avl) Alors :\n\técrire("Équilibré")\nfsi\n```',
+            signature: 'estAVL(A) : booléen',
+            snippet: 'estAVL(${1:A})',
+            methodSnippet: 'estAVL(${VAR})',
+            category: 'AVL',
+            targetType: ['avl', 'abr', 'arbin']
+        },
+        {
+            name: 'facteurequilibre',
+            arity: [1, 2],
+            luaHelper: '__psc_avl_facteur',
+            description: 'Facteur d\'équilibre : hauteur(droit) - hauteur(gauche). Doit être dans [-1, +1] pour un AVL. `facteurEquilibre(a)` (racine) ou `facteurEquilibre(a, n)`.\n\n```psc\nf ← facteurEquilibre(avl, racine(avl))\n```',
+            signature: 'facteurEquilibre(a [, n : Noeud]) : entier',
+            snippet: 'facteurEquilibre(${1:a})',
+            methodSnippet: 'facteurEquilibre(${VAR})',
+            category: 'AVL',
+            targetType: ['avl', 'abr', 'arbin', 'noeud']
+        },
+        {
+            name: 'rotationgauche',
+            arity: 2,
+            luaHelper: '__psc_avl_rotation_gauche',
+            description: 'Rotation gauche sur le nœud G : remonte son fils droit comme pivot (G devient fils gauche). Réarrangement local O(1).\n\n```psc\nrotationGauche(avl, racine(avl))\n```',
+            signature: 'rotationGauche(a, n : Noeud)',
+            snippet: 'rotationGauche(${1:a}, ${2:n})',
+            methodSnippet: 'rotationGauche(${VAR}, ${1:n})',
+            category: 'AVL',
+            targetType: ['avl', 'abr', 'arbin']
+        },
+        {
+            name: 'rotationdroite',
+            arity: 2,
+            luaHelper: '__psc_avl_rotation_droite',
+            description: 'Rotation droite sur G : le fils gauche devient pivot, G devient son fils droit. Sous-arbres intermédiaires réorganisés, O(1).\n\n```psc\nrotationDroite(avl, racine(avl))\n```',
+            signature: 'rotationDroite(a, n : Noeud)',
+            snippet: 'rotationDroite(${1:a}, ${2:n})',
+            methodSnippet: 'rotationDroite(${VAR}, ${1:n})',
+            category: 'AVL',
+            targetType: ['avl', 'abr', 'arbin']
+        },
+        {
+            name: 'rotationgauchedroite',
+            arity: 2,
+            luaHelper: '__psc_avl_rotation_gd',
+            description: 'Rotation double gauche-droite : corrige les configurations complexes (rotation gauche sur fils gauche puis droite sur n).\n\n```psc\nrotationGaucheDroite(avl, n)\n```',
+            signature: 'rotationGaucheDroite(a, n : Noeud)',
+            snippet: 'rotationGaucheDroite(${1:a}, ${2:n})',
+            methodSnippet: 'rotationGaucheDroite(${VAR}, ${1:n})',
+            category: 'AVL',
+            targetType: ['avl', 'abr', 'arbin']
+        },
+        {
+            name: 'rotationdroitegauche',
+            arity: 2,
+            luaHelper: '__psc_avl_rotation_dg',
+            description: 'Rotation double droite-gauche (symétrique) : rotation droite sur fils droit puis gauche sur n.\n\n```psc\nrotationDroiteGauche(avl, n)\n```',
+            signature: 'rotationDroiteGauche(a, n : Noeud)',
+            snippet: 'rotationDroiteGauche(${1:a}, ${2:n})',
+            methodSnippet: 'rotationDroiteGauche(${VAR}, ${1:n})',
+            category: 'AVL',
+            targetType: ['avl', 'abr', 'arbin']
         }
     ] as PscFunction[]
 };
