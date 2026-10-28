@@ -63,8 +63,8 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
             continue;
         }
 
-        // Détection type alias (ex: 'Soit ArbreBinaireEntier = arbin[entier]')
-        const typeAliasMatch = /^\s*Soit\s+([\p{L}_][\p{L}0-9_]*)\s*=/iu.exec(trimmed);
+        // Détection type alias (ex: 'Lexique = arbin(MotTraduction)' ou 'Soit ArbreBinaireEntier = arbin[entier]')
+        const typeAliasMatch = /^\s*(?:Soit\s+)?([\p{L}_][\p{L}0-9_]*)\s*=\s*(?!<)/iu.exec(trimmed);
         if (typeAliasMatch) {
             declaredCompositeTypes.add(typeAliasMatch[1].toLowerCase());
             continue;
@@ -110,7 +110,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         if (trimmedText === '' || /^\s*Algorithme\b/i.test(trimmedText) || /^\s*Lexique\b/i.test(trimmedText)) continue;
 
         // Ignorer les déclarations de types composites et types alias
-        if (PATTERNS.COMPOSITE_TYPE.test(trimmedText) || /^\s*Soit\s+[\p{L}_][\p{L}0-9_]*\s*=/iu.test(trimmedText)) continue;
+        if (PATTERNS.COMPOSITE_TYPE.test(trimmedText) || /^\s*(?:Soit\s+)?[\p{L}_][\p{L}0-9_]*\s*=\s*(?!<)/iu.test(trimmedText)) continue;
 
         let processedText = trimmedText;
         if (/^\s*Soit\s+/iu.test(processedText)) {

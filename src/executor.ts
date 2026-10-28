@@ -363,8 +363,8 @@ export function transpileToLua(pscCode: string): string {
         if (REGEX_ALGORITHM.test(trimmedLine)) continue;
         if (REGEX_DEBUT_OR_LEXIQUE.test(trimmedLine)) continue;
 
-        // Ignorer les déclarations de type alias (ex: 'Soit ArbreBinaireEntier = arbin[entier]')
-        if (/^\s*Soit\s+[\p{L}_][\p{L}0-9_]*\s*=/iu.test(trimmedLine)) {
+        // Ignorer les déclarations de type alias (ex: 'Lexique = arbin(MotTraduction)' ou 'Soit ArbreBinaireEntier = arbin[entier]')
+        if (/^\s*(?:Soit\s+)?[\p{L}_][\p{L}0-9_]*\s*=\s*(?!<)/iu.test(trimmedLine)) {
             continue;
         }
 

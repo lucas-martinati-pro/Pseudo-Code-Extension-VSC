@@ -34,7 +34,7 @@ Contrairement aux simples colorateurs de texte, **PseudoCode Language Interprete
 
 - ⚡ **Exécution instantanée en 1 clic :** Plus besoin de réécrire vos algorithmes en Python ou C pour les tester. Cliquez sur ▶️ et voyez le résultat s'afficher immédiatement dans le terminal !
 - 🛡️ **Analyse de diagnostics en temps réel (Linter) :** Détecte à la frappe les blocs mal fermés (`Si` sans `fsi`), les fermetures orphelines, les variables non déclarées et les erreurs d'arité dans les appels de fonctions.
-- 💡 **IntelliSense complet :** Autocomplétion contextuelle, aide à la signature des paramètres, documentation au survol (Hover), navigation vers la définition (`Ctrl+Clic` / `F12`) et exploration de symboles dans la vue Outline.
+- 💡 **IntelliSense complet :** Autocomplétion contextuelle, aide à la signature des paramètres, documentation au survol (Hover), navigation vers la définition (`Ctrl+Clic` / `F12`), renommage intelligent de variable (`F2` / Clic droit ➔ Renommer le symbole) et exploration de symboles dans la vue Outline.
 - ⌨️ **Remplacement automatique des symboles mathématiques :** Tapez `<-`, `<=`, `>=`, `!=` et ils se transforment automatiquement en `←`, `≤`, `≥`, `≠` !
 - 📐 **Formatage automatique de code (`Alt + Maj + F`) :** Réindente parfaitement les blocs, les structures de contrôle et les fonctions en respectant les standards académiques.
 - 🌳 **Bibliothèque complète de TDA (Types de Données Abstraits) :** Arbres Binaires récursifs, Listes chaînées, Piles LIFO, Files FIFO, Listes Symétriques, Tables associatives (HashMaps) et Ensembles.

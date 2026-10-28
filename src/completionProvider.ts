@@ -33,10 +33,9 @@ import {
 const REGEX_FUNC_DECL = /^\s*Fonction\s+([\p{L}_][\p{L}0-9_]*)\s*\(([^)]*)\)/iu;
 const REGEX_ASSIGNMENT = /^\s*([\p{L}_][\p{L}0-9_]*)\s*(?:←|<-)/u;
 const REGEX_VAR_DECL = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)*)\s*:\s*/u;
-const REGEX_AFTER_DOT = /(?:[\])]|[\p{L}_][\p{L}0-9_]*)\.$/u;
-// Capture le nom de la variable avant le '.', même à travers des accès [i] ou des appels ()
-const REGEX_DOT_VAR_NAME = /((?:[\p{L}_][\p{L}0-9_]*)(?:\[[^\]]*\])*(?:\([^)]*\))*)\.$/u;
+const REGEX_AFTER_DOT = /(?:[\])]|[\p{L}_][\p{L}0-9_]*)\.[\p{L}0-9_]*$/u;
 const REGEX_COMPOSITE_TYPE = /^([\p{L}_][\p{L}0-9_]*)\s*(?:=\s*)?<\s*(.+?)\s*>$/iu;
+const REGEX_TYPE_ALIAS = /^\s*(?:Soit\s+)?([\p{L}_][\p{L}0-9_]*)\s*=\s*(?!<)(.+)$/iu;
 const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
 const REGEX_LINE_COMMENT = /\/\/.*/;
 
@@ -116,7 +115,7 @@ const BUILTIN_TYPES: Array<{ label: string; detail: string }> = PSC_DEFINITIONS.
 // ANALYSE DU DOCUMENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-interface DocumentAnalysis {
+export interface DocumentAnalysis {
     variables: Map<string, string>;
     userFunctions: Map<string, { params: string; returnType: string; fullSignature: string }>;
     compositeTypes: Map<string, Array<{ name: string; type: string }>>;
@@ -125,26 +124,73 @@ interface DocumentAnalysis {
     currentFunctionParams: Array<{ name: string; type: string }>;
     /** nom de variable → type de base résolu (sans 'tableau', sans '[...]') */
     variableTypes: Map<string, string>;
+    /** nom de variable → type d'élément si conteneur (ex: 'MotTraduction') */
+    variableElementTypes: Map<string, string>;
+    /** nom d'alias (en minuscules) → { baseType: string; elementType?: string; raw: string } */
+    typeAliases: Map<string, { baseType: string; elementType?: string; raw: string }>;
+}
+
+interface TypeInfo {
+    baseType: string;
+    elementType?: string;
 }
 
 /**
- * Résout le type de base d'une déclaration de type de manière générique.
- * Ex: "tableau entier[0..n]" → "tableau", "Liste(Etudiant)" → "liste", "ensemble" → "ensemble", "chaîne" → "chaîne"
+ * Analyse et résout le type de base et d'élément (si conteneur paramétré).
+ * Gère les alias ('Lexique' → arbin(MotTraduction)), les types paramétrés ('arbin(MotTraduction)', 'liste[entier]'), etc.
  */
-function resolveBaseType(rawType: string): string {
+export function parseTypeInfo(rawType: string, typeAliases?: Map<string, { baseType: string; elementType?: string; raw: string }>): TypeInfo {
     const trimmed = rawType.trim();
-    // 1. Extraire le premier identifiant Unicode pour reconnaître tout type de base ("tableau ...", "ensemble ...", "fichier ...")
+    if (!trimmed) return { baseType: '' };
+
+    const lower = trimmed.toLowerCase();
+    if (typeAliases && typeAliases.has(lower)) {
+        const alias = typeAliases.get(lower)!;
+        return { baseType: alias.baseType, elementType: alias.elementType };
+    }
+
+    // Types paramétrés : arbin(MotTraduction), arbin[MotTraduction], liste(entier), etc.
+    const paramMatch = trimmed.match(/^([\p{L}_][\p{L}0-9_]*)\s*[(\[]\s*([^()\[\]]+?)\s*[)\]]/u);
+    if (paramMatch) {
+        const rawBase = paramMatch[1].toLowerCase();
+        const base = TYPE_MAPPING[rawBase] || (typeAliases?.get(rawBase)?.baseType) || rawBase;
+        const rawElem = paramMatch[2].trim();
+        const elem = (typeAliases?.get(rawElem.toLowerCase())?.baseType) || rawElem;
+        return { baseType: base, elementType: elem };
+    }
+
     const match = trimmed.match(/^[\p{L}_][\p{L}0-9_]*/u);
     if (match) {
         const firstWord = match[0].toLowerCase();
+        if (typeAliases && typeAliases.has(firstWord)) {
+            const alias = typeAliases.get(firstWord)!;
+            return { baseType: alias.baseType, elementType: alias.elementType };
+        }
+        if (firstWord === 'tableau') {
+            const afterTableau = trimmed.substring(match[0].length).trim();
+            const elemMatch = afterTableau.match(/^([\p{L}_][\p{L}0-9_]*)/u);
+            return {
+                baseType: 'tableau',
+                elementType: elemMatch ? elemMatch[1] : undefined
+            };
+        }
         if (TYPE_MAPPING[firstWord]) {
-            return TYPE_MAPPING[firstWord];
+            return { baseType: TYPE_MAPPING[firstWord] };
         }
     }
-    // 2. Traiter les types paramétrés avec parenthèses comme "Liste(Etudiant)" -> "liste"
+
     const parenIdx = trimmed.indexOf('(');
-    const base = (parenIdx !== -1 ? trimmed.substring(0, parenIdx) : trimmed).trim().toLowerCase();
-    return TYPE_MAPPING[base] || base;
+    const bracketIdx = trimmed.indexOf('[');
+    const splitIdx = (parenIdx !== -1 && bracketIdx !== -1)
+        ? Math.min(parenIdx, bracketIdx)
+        : (parenIdx !== -1 ? parenIdx : bracketIdx);
+    const base = (splitIdx !== -1 ? trimmed.substring(0, splitIdx) : trimmed).trim().toLowerCase();
+    const resolved = TYPE_MAPPING[base] || (typeAliases?.get(base)?.baseType) || base;
+    return { baseType: resolved };
+}
+
+export function resolveBaseType(rawType: string, typeAliases?: Map<string, { baseType: string; elementType?: string; raw: string }>): string {
+    return parseTypeInfo(rawType, typeAliases).baseType;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -164,12 +210,14 @@ function getCachedAnalysis(document: vscode.TextDocument, cursorLine: number): D
     return analysis;
 }
 
-function analyzeDocument(document: vscode.TextDocument, cursorLine: number): DocumentAnalysis {
+export function analyzeDocument(document: vscode.TextDocument, cursorLine: number): DocumentAnalysis {
     const variables = new Map<string, string>();
     const userFunctions = new Map<string, { params: string; returnType: string; fullSignature: string }>();
     const compositeTypes = new Map<string, Array<{ name: string; type: string }>>();
     const openBlocks: Array<{ block: BlockDefinition; line: number }> = [];
     const variableTypes = new Map<string, string>();
+    const variableElementTypes = new Map<string, string>();
+    const typeAliases = new Map<string, { baseType: string; elementType?: string; raw: string }>();
     let currentFunctionName: string | null = null;
     let currentFunctionParams: Array<{ name: string; type: string }> = [];
     let inLexiqueBlock = false;
@@ -188,6 +236,20 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
             const fields = parseCompositeFields(fieldsStr);
             compositeTypes.set(typeName, fields);
             compositeTypes.set(typeName.toLowerCase(), fields);
+            continue;
+        }
+
+        // Détection des types alias (ex: Lexique = arbin(MotTraduction) ou Soit ArbreBinaireEntier = arbin[entier])
+        const aliasMatch = REGEX_TYPE_ALIAS.exec(trimmed);
+        if (aliasMatch) {
+            const aliasName = aliasMatch[1];
+            const rawTarget = aliasMatch[2].trim();
+            const info = parseTypeInfo(rawTarget, typeAliases);
+            typeAliases.set(aliasName.toLowerCase(), {
+                baseType: info.baseType,
+                elementType: info.elementType,
+                raw: rawTarget
+            });
             continue;
         }
 
@@ -213,7 +275,11 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
                     if (p.name) {
                         currentFunctionParams.push({ name: p.name, type: p.type });
                         variables.set(p.name, p.type);
-                        variableTypes.set(p.name, resolveBaseType(p.type));
+                        const typeInfo = parseTypeInfo(p.type, typeAliases);
+                        variableTypes.set(p.name, typeInfo.baseType);
+                        if (typeInfo.elementType) {
+                            variableElementTypes.set(p.name, typeInfo.elementType);
+                        }
                     }
                 }
             }
@@ -248,7 +314,11 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
                     for (const v of varNames) {
                         if (v) {
                             variables.set(v, varType);
-                            variableTypes.set(v, resolveBaseType(varType));
+                            const typeInfo = parseTypeInfo(varType, typeAliases);
+                            variableTypes.set(v, typeInfo.baseType);
+                            if (typeInfo.elementType) {
+                                variableElementTypes.set(v, typeInfo.elementType);
+                            }
                         }
                     }
                 }
@@ -262,9 +332,32 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
             const varName = assignMatch[1];
             const rhs = trimmed.substring(trimmed.indexOf('←') + 1).trim();
             let guessedType = '';
+            let guessedElemType = '';
 
-            // Deviner le type à partir du RHS
-            if (/^\s*tableau\b/i.test(rhs)) guessedType = 'tableau';
+            // 1. val(...) sur un conteneur dont l'élément est connu
+            if (/^\s*val\s*\(/i.test(rhs)) {
+                const inner = rhs.substring(rhs.indexOf('(') + 1, rhs.lastIndexOf(')')).trim();
+                const idents = inner.match(/[\p{L}_][\p{L}0-9_]*/gu) || [];
+                for (const id of idents) {
+                    if (variableElementTypes.has(id)) {
+                        guessedType = variableElementTypes.get(id)!;
+                        break;
+                    }
+                }
+            }
+            // 2. Fonctions renvoyant un nœud : racine, fg, fd, pere
+            else if (/^\s*(?:racine|fg|fd|pere)\s*\(/i.test(rhs)) {
+                guessedType = 'noeud';
+                const inner = rhs.substring(rhs.indexOf('(') + 1, rhs.lastIndexOf(')')).trim();
+                const idents = inner.match(/[\p{L}_][\p{L}0-9_]*/gu) || [];
+                for (const id of idents) {
+                    if (variableElementTypes.has(id)) {
+                        guessedElemType = variableElementTypes.get(id)!;
+                        break;
+                    }
+                }
+            }
+            else if (/^\s*tableau\b/i.test(rhs)) guessedType = 'tableau';
             else if (/^\s*\[/i.test(rhs)) guessedType = 'tableau';
             else if (/^\s*listeVide\s*\(/i.test(rhs) || /^\s*Liste\s*\(/i.test(rhs) || /^\s*ajoutTeteListe\b/i.test(rhs)) guessedType = 'liste';
             else if (/^\s*pileVide\s*\(/i.test(rhs)) guessedType = 'pile';
@@ -283,18 +376,23 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
 
             variables.set(varName, guessedType);
             if (guessedType) variableTypes.set(varName, guessedType);
+            if (guessedElemType) variableElementTypes.set(varName, guessedElemType);
         }
 
         // Variables déclarées avec `:` hors Lexique (inline)
         // Détecte: "x : entier" au milieu du code
         if (i < cursorLine && !funcMatch) {
-            const inlineDecl = /^\s*([\p{L}_][\p{L}0-9_]*)\s*:\s*([\p{L}_][\p{L}0-9_]*(?:\s*[\p{L}_][\p{L}0-9_]*)?(?:\[.*?\])?)/u.exec(trimmed);
+            const inlineDecl = /^\s*([\p{L}_][\p{L}0-9_]*)\s*:\s*([\p{L}_][\p{L}0-9_]*(?:\s*[\p{L}_][\p{L}0-9_]*)?(?:\[.*?\])?|\([^)]*\))/u.exec(trimmed);
             if (inlineDecl && !/^\s*(Si|Pour|Tant|Sinon|Début|Fin|Algorithme|Fonction)\b/i.test(trimmed)) {
                 const vName = inlineDecl[1];
                 const vType = inlineDecl[2].trim();
                 if (!variables.has(vName)) {
                     variables.set(vName, vType);
-                    variableTypes.set(vName, resolveBaseType(vType));
+                    const typeInfo = parseTypeInfo(vType, typeAliases);
+                    variableTypes.set(vName, typeInfo.baseType);
+                    if (typeInfo.elementType) {
+                        variableElementTypes.set(vName, typeInfo.elementType);
+                    }
                 }
             }
         }
@@ -324,8 +422,210 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
 
     return {
         variables, userFunctions, compositeTypes, openBlocks,
-        currentFunctionName, currentFunctionParams, variableTypes
+        currentFunctionName, currentFunctionParams, variableTypes,
+        variableElementTypes, typeAliases
     };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RÉSOLUTION DE TYPE D'EXPRESSION ET PARSING AVANT POINT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Extrait l'expression précédant le dernier point '.'
+ * Gère correctement les parenthèses, crochets et identifiants imbriqués (ex: 'val(racine(phrase), phrase).', 'tab[i].', 'trad.')
+ */
+export function extractExprBeforeDot(textBeforeCursor: string): string {
+    const dotIdx = textBeforeCursor.lastIndexOf('.');
+    if (dotIdx === -1) return '';
+    const text = textBeforeCursor.substring(0, dotIdx);
+    let i = text.length - 1;
+    while (i >= 0 && /\s/.test(text[i])) {
+        i--;
+    }
+    const end = i;
+    let parenDepth = 0;
+    let bracketDepth = 0;
+    while (i >= 0) {
+        const char = text[i];
+        if (char === ')') {
+            parenDepth++;
+            i--;
+        } else if (char === '(') {
+            if (parenDepth > 0) {
+                parenDepth--;
+                i--;
+            } else {
+                break;
+            }
+        } else if (char === ']') {
+            bracketDepth++;
+            i--;
+        } else if (char === '[') {
+            if (bracketDepth > 0) {
+                bracketDepth--;
+                i--;
+            } else {
+                break;
+            }
+        } else if (parenDepth > 0 || bracketDepth > 0) {
+            i--;
+        } else {
+            // Hors parenthèses/crochets: accepter les caractères d'identifiants et le point '.'
+            if (/[\p{L}0-9_.]/u.test(char)) {
+                i--;
+            } else {
+                break;
+            }
+        }
+    }
+    return text.substring(i + 1, end + 1).trim();
+}
+
+/**
+ * Résout le type effectif d'une expression pour l'autocomplétion par point
+ * Renvoie un nom de type normalisé (ex: 'arbin', 'MotTraduction', 'noeud', 'liste', etc.)
+ */
+export function resolveExpressionType(expr: string, analysis: DocumentAnalysis): string | undefined {
+    const trimmed = expr.trim();
+    if (!trimmed) return undefined;
+
+    // 1. Accès chaîné par point hors parenthèses / crochets (ex: 'personne.adresse')
+    let lastDot = -1;
+    let pDepth = 0;
+    let bDepth = 0;
+    for (let i = trimmed.length - 1; i >= 0; i--) {
+        const c = trimmed[i];
+        if (c === ')') pDepth++;
+        else if (c === '(') pDepth--;
+        else if (c === ']') bDepth++;
+        else if (c === '[') bDepth--;
+        else if (c === '.' && pDepth === 0 && bDepth === 0) {
+            lastDot = i;
+            break;
+        }
+    }
+    if (lastDot !== -1) {
+        const target = trimmed.substring(0, lastDot);
+        const field = trimmed.substring(lastDot + 1);
+        const targetType = resolveExpressionType(target, analysis);
+        if (targetType) {
+            const fields = analysis.compositeTypes.get(targetType) || analysis.compositeTypes.get(targetType.toLowerCase());
+            if (fields) {
+                const found = fields.find(f => f.name.toLowerCase() === field.toLowerCase());
+                if (found) {
+                    const info = parseTypeInfo(found.type, analysis.typeAliases);
+                    return info.baseType;
+                }
+            }
+        }
+        return undefined;
+    }
+
+    // 2. Accès indicé de conteneur (ex: 'tab[i]')
+    if (trimmed.endsWith(']')) {
+        const openBracket = trimmed.lastIndexOf('[');
+        if (openBracket !== -1) {
+            const baseExpr = trimmed.substring(0, openBracket).trim();
+            if (analysis.variableElementTypes.has(baseExpr)) {
+                return analysis.variableElementTypes.get(baseExpr);
+            }
+            if (analysis.variableElementTypes.has(baseExpr.toLowerCase())) {
+                return analysis.variableElementTypes.get(baseExpr.toLowerCase());
+            }
+            const baseType = resolveExpressionType(baseExpr, analysis);
+            if (baseType) {
+                const info = parseTypeInfo(baseType, analysis.typeAliases);
+                return info.elementType || info.baseType;
+            }
+        }
+    }
+
+    // 3. Appel de fonction (ex: 'val(racine(phrase), phrase)' ou 'racine(phrase)')
+    if (trimmed.endsWith(')')) {
+        const openParen = trimmed.indexOf('(');
+        if (openParen !== -1) {
+            const funcName = trimmed.substring(0, openParen).trim();
+            const funcLower = funcName.toLowerCase();
+            const innerArgs = trimmed.substring(openParen + 1, trimmed.length - 1);
+
+            // Cas spécial : 'val(arbre, noeud)' ou 'val(noeud, arbre)'
+            // Renvoie le type d'élément stocké dans l'arbre / la liste
+            if (funcLower === 'val') {
+                const idents = innerArgs.match(/[\p{L}_][\p{L}0-9_]*/gu) || [];
+                for (const id of idents) {
+                    if (analysis.variableElementTypes.has(id)) {
+                        return analysis.variableElementTypes.get(id);
+                    }
+                    if (analysis.variableElementTypes.has(id.toLowerCase())) {
+                        return analysis.variableElementTypes.get(id.toLowerCase());
+                    }
+                }
+                return undefined;
+            }
+
+            // Primitives arbin renvoyant un nœud
+            if (funcLower === 'racine' || funcLower === 'fg' || funcLower === 'fd' || funcLower === 'pere') {
+                return 'noeud';
+            }
+
+            if (funcLower === 'creerarb' || funcLower === 'créerarb') {
+                return 'arbin';
+            }
+
+            if (funcLower === 'listevide' || funcLower === 'creerliste') {
+                return 'liste';
+            }
+
+            if (funcLower === 'pilevide') return 'pile';
+            if (funcLower === 'filevide') return 'file';
+            if (funcLower === 'tablevide') return 'table';
+
+            // Fonction utilisateur
+            const userFunc = analysis.userFunctions.get(funcName);
+            if (userFunc && userFunc.returnType) {
+                const info = parseTypeInfo(userFunc.returnType, analysis.typeAliases);
+                return info.baseType;
+            }
+        }
+    }
+
+    // 4. Identifiant simple (variable, paramètre, nom de type, alias)
+    const varName = trimmed;
+    if (analysis.variableTypes.has(varName)) {
+        return analysis.variableTypes.get(varName);
+    }
+    if (analysis.variableTypes.has(varName.toLowerCase())) {
+        return analysis.variableTypes.get(varName.toLowerCase());
+    }
+
+    if (analysis.variables.has(varName)) {
+        const raw = analysis.variables.get(varName)!;
+        const info = parseTypeInfo(raw, analysis.typeAliases);
+        return info.baseType;
+    }
+    if (analysis.variables.has(varName.toLowerCase())) {
+        const raw = analysis.variables.get(varName.toLowerCase())!;
+        const info = parseTypeInfo(raw, analysis.typeAliases);
+        return info.baseType;
+    }
+
+    if (analysis.compositeTypes.has(varName)) {
+        return varName;
+    }
+    if (analysis.compositeTypes.has(varName.toLowerCase())) {
+        return varName;
+    }
+
+    if (analysis.typeAliases.has(varName.toLowerCase())) {
+        return analysis.typeAliases.get(varName.toLowerCase())!.baseType;
+    }
+
+    if (TYPE_METHODS[varName.toLowerCase()]) {
+        return varName.toLowerCase();
+    }
+
+    return undefined;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -352,18 +652,9 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
         const items: vscode.CompletionItem[] = [];
 
         // ─── Contexte : après '.' → champs de structure ET méthodes du type ───
-        const dotMatch = REGEX_AFTER_DOT.exec(textBeforeCursor);
-        if (dotMatch) {
-            // Extraire le nom de base de la variable (avant les [i] ou ())
-            const fullDotMatch = REGEX_DOT_VAR_NAME.exec(textBeforeCursor);
-            let baseVarName = '';
-            if (fullDotMatch) {
-                // Extraire le vrai nom de la variable : "tab[i]" → "tab", "val(l, p)" → "val"
-                const full = fullDotMatch[1];
-                const baseMatch = full.match(/^([\p{L}_][\p{L}0-9_]*)/u);
-                baseVarName = baseMatch ? baseMatch[1] : '';
-            }
-            return this.getDotCompletions(baseVarName, analysis);
+        if (REGEX_AFTER_DOT.test(textBeforeCursor)) {
+            const expr = extractExprBeforeDot(textBeforeCursor);
+            return this.getDotCompletions(expr, analysis);
         }
 
         // ─── Contexte : ligne d'en-tête Fonction ou Procédure ───
@@ -515,19 +806,19 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
     /**
      * Complétion après '.' — propose les champs de structure ET les méthodes du type
      */
-    private getDotCompletions(varName: string, analysis: DocumentAnalysis): vscode.CompletionItem[] {
+    private getDotCompletions(expr: string, analysis: DocumentAnalysis): vscode.CompletionItem[] {
         const items: vscode.CompletionItem[] = [];
-        const typeName = analysis.variableTypes.get(varName);
+        const resolvedType = resolveExpressionType(expr, analysis);
         const addedNames = new Set<string>();
 
-        // 1. Champs de structure (si c'est un type composite)
-        if (typeName) {
-            const fields = analysis.compositeTypes.get(typeName) || analysis.compositeTypes.get(typeName.toLowerCase());
+        // 1. Champs de structure (si c'est un type composite personnalisé)
+        if (resolvedType) {
+            const fields = analysis.compositeTypes.get(resolvedType) || analysis.compositeTypes.get(resolvedType.toLowerCase());
             if (fields) {
                 for (const field of fields) {
                     const item = new vscode.CompletionItem(field.name, vscode.CompletionItemKind.Field);
-                    item.detail = `${field.type}  (champ de ${typeName})`;
-                    item.documentation = new vscode.MarkdownString(`Champ \`${field.name}\` de type \`${field.type}\` dans \`${typeName}\``);
+                    item.detail = `${field.type}  (champ de ${resolvedType})`;
+                    item.documentation = new vscode.MarkdownString(`Champ \`${field.name}\` de type \`${field.type}\` dans \`${resolvedType}\``);
                     item.sortText = `0_${field.name}`;
                     items.push(item);
                     addedNames.add(field.name);
@@ -535,19 +826,18 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
             }
         }
 
-        // 2. Méthodes du type (fonctions intégrées qui prennent ce type en 1er argument)
-        if (typeName) {
-            const resolvedType = typeName.toLowerCase();
-            const methods = TYPE_METHODS[resolvedType];
+        // 2. Méthodes du type (fonctions intégrées rattachées à ce type via targetType)
+        if (resolvedType) {
+            const key = resolvedType.toLowerCase();
+            const methods = TYPE_METHODS[key];
             if (methods) {
                 for (const method of methods) {
                     if (addedNames.has(method.name)) continue;
                     const item = new vscode.CompletionItem(method.name, vscode.CompletionItemKind.Method);
                     item.detail = method.signature;
                     item.documentation = new vscode.MarkdownString(
-                        `**${resolvedType}** — ${method.description}\n\n\`\`\`psc\n${method.signature}\n\`\`\``
+                        `**${key}** — ${method.description}\n\n\`\`\`psc\n${method.signature}\n\`\`\``
                     );
-                    // Juste insérer le nom de la méthode — le point est déjà tapé
                     item.insertText = method.name;
                     item.sortText = `1_${method.name}`;
                     items.push(item);
@@ -556,8 +846,9 @@ export class PscCompletionProvider implements vscode.CompletionItemProvider {
             }
         }
 
-        // 3. Fallback : proposer tous les champs de tous les types composites
-        if (items.length === 0) {
+        // 3. Fallback : UNIQUEMENT si l'expression a un type totalement inconnu (ex: variable non déclarée)
+        // Ne PAS proposer les champs si resolvedType est un type primitif (ex: arbin, entier, réel, chaîne...)
+        if (items.length === 0 && !resolvedType) {
             for (const [, fields] of analysis.compositeTypes) {
                 for (const field of fields) {
                     if (!addedNames.has(field.name)) {
@@ -796,7 +1087,7 @@ export class PscSignatureHelpProvider implements vscode.SignatureHelpProvider {
 // UTILITAIRES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function isInCommentOrString(lineText: string, charPos: number): boolean {
+export function isInCommentOrString(lineText: string, charPos: number): boolean {
     const commentIdx = lineText.indexOf('//');
     if (commentIdx !== -1 && charPos > commentIdx) return true;
 

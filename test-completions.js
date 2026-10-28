@@ -57,7 +57,15 @@ const mockVscode = {
             this.end = end;
         }
     },
-    Location: class {}
+    Location: class {},
+    WorkspaceEdit: class {
+        constructor() {
+            this.edits = [];
+        }
+        replace(uri, range, newText) {
+            this.edits.push({ uri, range, newText });
+        }
+    }
 };
 
 Module.prototype.require = function (modulePath) {
@@ -67,8 +75,9 @@ Module.prototype.require = function (modulePath) {
     return originalRequire.apply(this, arguments);
 };
 
-// 2. Importer le provider compilé
+// 2. Importer les providers compilés
 const { PscCompletionProvider } = require('./out/completionProvider');
+const { PscRenameProvider } = require('./out/renameProvider');
 
 function createMockDocument(lines, version = 1) {
     return {
@@ -76,7 +85,27 @@ function createMockDocument(lines, version = 1) {
         version,
         lineCount: lines.length,
         lineAt: (i) => ({ text: lines[i] }),
-        getText: () => lines.join('\n')
+        getText: (range) => {
+            if (!range) return lines.join('\n');
+            const line = lines[range.start.line];
+            return line.substring(range.start.character, range.end.character);
+        },
+        getWordRangeAtPosition: (position, regex) => {
+            const line = lines[position.line];
+            if (!line) return undefined;
+            const flags = regex.flags ? (regex.flags.includes('g') ? regex.flags : regex.flags + 'g') : 'gu';
+            const re = new RegExp(regex.source, flags);
+            let m;
+            while ((m = re.exec(line)) !== null) {
+                if (position.character >= m.index && position.character <= m.index + m[0].length) {
+                    return new mockVscode.Range(
+                        new mockVscode.Position(position.line, m.index),
+                        new mockVscode.Position(position.line, m.index + m[0].length)
+                    );
+                }
+            }
+            return undefined;
+        }
     };
 }
 
@@ -229,6 +258,162 @@ const provider = new PscCompletionProvider();
     console.log('  ✓ Test 7 : Champs de types composites correctement traités');
 }
 
+// Test 8: Complétion après "." sur phrase : Lexique (arbin) -> fonctions arbin et PAS champs de MotTraduction
+{
+    const lines = [
+        'MotTraduction = < français : chaîne, anglais : chaîne >',
+        'Lexique = arbin(MotTraduction)',
+        '',
+        'Fonction traduction(mot : chaîne, phrase : Lexique) : chaîne',
+        'Début',
+        '    phrase.',
+        'Fin'
+    ];
+    const doc = createMockDocument(lines, 8);
+    const pos = new mockVscode.Position(5, 11); // juste après "phrase."
+    const items = provider.provideCompletionItems(doc, pos, {}, {});
+
+    const hasRacine = items.some(it => it.label === 'racine');
+    const hasVal = items.some(it => it.label === 'val');
+    const hasFg = items.some(it => it.label === 'fg');
+    const hasFrancais = items.some(it => it.label === 'français');
+    const hasAnglais = items.some(it => it.label === 'anglais');
+
+    assert.ok(hasRacine, 'phrase. doit proposer les fonctions de arbin (racine)');
+    assert.ok(hasVal, 'phrase. doit proposer les fonctions de arbin (val)');
+    assert.ok(hasFg, 'phrase. doit proposer les fonctions de arbin (fg)');
+    assert.strictEqual(hasFrancais, false, 'phrase. ne doit PAS proposer le champ "français" du type de l\'élément');
+    assert.strictEqual(hasAnglais, false, 'phrase. ne doit PAS proposer le champ "anglais" du type de l\'élément');
+    console.log('  ✓ Test 8 : Complétion sur phrase. propose les méthodes arbin et non les champs de l\'élément');
+}
+
+// Test 9: Complétion après "." sur trad (élément obtenu via val(phrase, noeud)) -> propose français et anglais
+{
+    const lines = [
+        'MotTraduction = < français : chaîne, anglais : chaîne >',
+        'Lexique = arbin(MotTraduction)',
+        '',
+        'Fonction traduction(mot : chaîne, phrase : Lexique) : chaîne',
+        'Début',
+        '    noeud ← racine(phrase)',
+        '    Si non noeudVide(phrase, noeud) Alors :',
+        '        trad ← val(phrase, noeud)',
+        '        trad.',
+        '    fsi',
+        'Fin'
+    ];
+    const doc = createMockDocument(lines, 9);
+    const pos = new mockVscode.Position(8, 13); // juste après "trad."
+    const items = provider.provideCompletionItems(doc, pos, {}, {});
+
+    const hasFrancais = items.some(it => it.label === 'français');
+    const hasAnglais = items.some(it => it.label === 'anglais');
+    assert.ok(hasFrancais, 'trad. doit proposer "français"');
+    assert.ok(hasAnglais, 'trad. doit proposer "anglais"');
+    console.log('  ✓ Test 9 : Complétion sur trad. (val(phrase, noeud)) propose français et anglais');
+}
+
+// Test 10: Complétion après "." sur val(racine(phrase), phrase). -> propose français et anglais
+{
+    const lines = [
+        'MotTraduction = < français : chaîne, anglais : chaîne >',
+        'Lexique = arbin(MotTraduction)',
+        '',
+        'Fonction traduction(mot : chaîne, phrase : Lexique) : chaîne',
+        'Début',
+        '    val(racine(phrase), phrase).',
+        'Fin'
+    ];
+    const doc = createMockDocument(lines, 10);
+    const pos = new mockVscode.Position(5, 32); // juste après "val(racine(phrase), phrase)."
+    const items = provider.provideCompletionItems(doc, pos, {}, {});
+
+    const hasFrancais = items.some(it => it.label === 'français');
+    const hasAnglais = items.some(it => it.label === 'anglais');
+    assert.ok(hasFrancais, 'val(racine(phrase), phrase). doit proposer "français"');
+    assert.ok(hasAnglais, 'val(racine(phrase), phrase). doit proposer "anglais"');
+    console.log('  ✓ Test 10 : Complétion directe sur val(racine(phrase), phrase). propose français et anglais');
+}
+
+// Test 11 : Rename Provider - Renommer une variable locale / paramètre
+{
+    const renameProvider = new PscRenameProvider();
+    const lines = [
+        'MotTraduction = < français : chaîne, anglais : chaîne >',
+        'Lexique = arbin(MotTraduction)',
+        '',
+        'Fonction traduction(mot : chaîne, phrase : Lexique) : chaîne',
+        'Début',
+        '    noeud ← racine(phrase)',
+        '    Si non noeudVide(phrase, noeud) Alors :',
+        '        trad ← val(phrase, noeud)',
+        '        Si trad.français = mot Alors :',
+        '            retourner trad.anglais',
+        '        fsi',
+        '    fsi',
+        'Fin'
+    ];
+    const doc = createMockDocument(lines, 11);
+
+    // Renommer le paramètre "mot" sur la ligne 3 (caractère 21)
+    const pos = new mockVscode.Position(3, 21);
+    const prep = renameProvider.prepareRename(doc, pos, {});
+    assert.strictEqual(prep.placeholder, 'mot');
+
+    const edit = renameProvider.provideRenameEdits(doc, pos, 'recherche', {});
+    assert.ok(edit && edit.edits.length === 2, 'Doit renommer "mot" dans la signature et dans la comparaison');
+    assert.strictEqual(edit.edits[0].newText, 'recherche');
+    assert.strictEqual(edit.edits[1].newText, 'recherche');
+    console.log('  ✓ Test 11 : Renommage du paramètre "mot" en "recherche" correctement scopé');
+}
+
+// Test 12 : Rename Provider - Renommer un champ de structure (ex: .français)
+{
+    const renameProvider = new PscRenameProvider();
+    const lines = [
+        'MotTraduction = < français : chaîne, anglais : chaîne >',
+        'Lexique = arbin(MotTraduction)',
+        '',
+        'Fonction traduction(mot : chaîne, phrase : Lexique) : chaîne',
+        'Début',
+        '    trad ← val(phrase, noeud)',
+        '    Si trad.français = mot Alors :',
+        '        retourner trad.anglais',
+        '    fsi',
+        'Fin'
+    ];
+    const doc = createMockDocument(lines, 12);
+
+    // Curseur sur "français" après "trad." ligne 6 (caractère 13)
+    const pos = new mockVscode.Position(6, 13);
+    const edit = renameProvider.provideRenameEdits(doc, pos, 'langueFr', {});
+    assert.ok(edit && edit.edits.length === 2, 'Doit renommer la déclaration du champ et l\'accès trad.français');
+    assert.strictEqual(edit.edits[0].newText, 'langueFr');
+    assert.strictEqual(edit.edits[1].newText, 'langueFr');
+    console.log('  ✓ Test 12 : Renommage d\'un champ de structure (.français -> .langueFr) sans impacter les variables');
+}
+
+// Test 13 : Rename Provider - Refus des mots réservés
+{
+    const renameProvider = new PscRenameProvider();
+    const lines = [
+        'Fonction f(x : entier) : entier',
+        'Début',
+        '    Si x = 0 Alors :',
+        '        retourner 0',
+        '    fsi',
+        'Fin'
+    ];
+    const doc = createMockDocument(lines, 13);
+    const posSi = new mockVscode.Position(2, 5); // sur "Si"
+
+    assert.throws(() => {
+        renameProvider.prepareRename(doc, posSi, {});
+    }, /mot-clé ou une primitive/);
+    console.log('  ✓ Test 13 : Refus de renommer les mots réservés (Si)');
+}
+
 console.log('===============================================================');
-console.log('  TOUS LES TESTS DU COMPLETION PROVIDER ONT RÉUSSI !');
+console.log('  TOUS LES TESTS DU COMPLETION PROVIDER ET RENAME ONT RÉUSSI !');
 console.log('===============================================================');
+

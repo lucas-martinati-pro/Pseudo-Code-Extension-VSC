@@ -5,6 +5,7 @@ import { executeCode, cleanOldTempFiles } from './services/runner';
 import { linter } from './services/linter';
 import { handleSymbolReplacement as handleSymbolReplacementImpl } from './autoEdits/symbols';
 import { PscCompletionProvider, PscSignatureHelpProvider, PscHoverProvider, PscDefinitionProvider } from './completionProvider';
+import { PscRenameProvider } from './renameProvider';
 
 // Une "collection de diagnostics" est le conteneur de VS Code pour toutes nos erreurs
 const diagnosticsCollection = vscode.languages.createDiagnosticCollection('psc');
@@ -53,6 +54,12 @@ function registerIntellisenseProviders(context: vscode.ExtensionContext) {
     intellisenseDisposables.push(vscode.languages.registerDefinitionProvider(
         'psc',
         new PscDefinitionProvider()
+    ));
+
+    // --- RENOMMER UN SYMBOLE (Clic droit -> Renommer / F2) ---
+    intellisenseDisposables.push(vscode.languages.registerRenameProvider(
+        'psc',
+        new PscRenameProvider()
     ));
 
     // Ajouter au contexte pour le nettoyage à la désactivation de l'extension

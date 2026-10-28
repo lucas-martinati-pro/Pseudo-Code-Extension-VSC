@@ -1,3 +1,20 @@
+# 🚀 Release v0.4.27 — PseudoCode Language Interpreter
+
+### 🎯 Correction & Amélioration de l'Autocomplétion (Dot-completion)
+- **Typage des conteneurs & alias de types :**
+  - Prise en charge des alias de types (`Lexique = arbin(MotTraduction)`).
+  - La complétion par point sur une variable d'arbre (`phrase.`) propose désormais exclusivement les 10 primitives d'arbres binaires (`racine`, `val`, `fg`, `fd`, `noeudvide`, `créerarb`, `adjfg`, `adjfd`, `chgarb`, `supfg`, `supfd`), et non plus par erreur les champs du type contenu (`français`, `anglais`).
+  - Détection automatique du type de l'élément extrait avec `val(phrase, noeud)` ou `val(racine(phrase), phrase).` : les champs de structure (`trad.français`, `trad.anglais`) sont désormais proposés au bon endroit, uniquement sur la valeur ou le nœud extrait !
+
+### ✏️ Renommage de Variables & Symboles (Rename Provider)
+- **Support natif du renommage (`F2` / Clic droit ➔ Renommer le symbole) :**
+  - Renommage scopé des variables locales et des paramètres de fonctions au sein de leur corps.
+  - Renommage global des fonctions, procédures, types et variables globales à travers le document.
+  - Prise en charge du renommage contextuel des champs de structures sans impacter les variables portant le même nom.
+  - Sécurité : interdiction de renommer les mots réservés du langage, les chaînes de caractères et les commentaires.
+
+---
+
 # 🚀 Release v0.4.26 — PseudoCode Language Interpreter
 
 ### 🧹 Nettoyage des Primitives
