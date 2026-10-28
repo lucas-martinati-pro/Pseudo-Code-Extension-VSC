@@ -374,12 +374,10 @@ adjfd(arbre, r, 15)
 
 | Primitive | Signature | Description |
 | :--- | :--- | :--- |
-| `créerarb(v)` | `créerarb(v : V) : ArbreBinaire` | Crée un arbre binaire dont la racine contient `v`. |
-| `arbrevide()` | `arbrevide() : ArbreBinaire` | Instancie un arbre vide (ou teste si l'arbre est vide). |
+| `créerarb(v)` | `créerarb(v : V) : ArbreBinaire` | Crée un arbre binaire dont la racine contient `v` (ou arbre vide si omis). |
 | `racine(a)` | `racine(a : ArbreBinaire) : Noeud` | Retourne la racine de l'arbre (`nil` si vide). |
 | `fg(a, n)` | `fg(a : ArbreBinaire, n : Noeud) : Noeud` | Retourne le fils gauche du nœud `n`. |
 | `fd(a, n)` | `fd(a : ArbreBinaire, n : Noeud) : Noeud` | Retourne le fils droit du nœud `n`. |
-| `pere(a, n)` | `pere(a : ArbreBinaire, n : Noeud) : Noeud` | Retourne le nœud parent de `n` (`nil` si racine). |
 | `val(a, n)` | `val(a : ArbreBinaire, n : Noeud) : V` | Renvoie la valeur stockée dans le nœud `n`. |
 | `noeudvide(a, n)`| `noeudvide(a : ArbreBinaire, n : Noeud) : booléen` | Teste si le nœud est vide (`nil`). |
 | `adjfg(a, n, v)`| `adjfg(a : ArbreBinaire, n : Noeud, v : V)` | Ajoute un fils gauche contenant la valeur `v` à `n`. |

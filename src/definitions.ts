@@ -1151,27 +1151,6 @@ export const PSC_DEFINITIONS = {
             category: 'Arbre Binaire',
             targetType: ['arbin', 'arbrebinaire', 'noeud']
         },
-        {
-            name: 'arbrevide',
-            arity: [0, 1],
-            luaHelper: '__psc_arbin_vide',
-            description: 'Instancie un arbre binaire vide (ou teste si l\'arbre `a` est vide si un argument est fourni).\n\n```psc\nmonArbre ← arbrevide()\n```',
-            signature: 'arbreVide([a : ArbreBinaire]) : ArbreBinaire | booléen',
-            snippet: 'arbreVide()',
-            category: 'Arbre Binaire',
-            targetType: ['arbin', 'arbrebinaire']
-        },
-        {
-            name: 'pere',
-            arity: [1, 2],
-            luaHelper: '__psc_arbin_pere',
-            description: 'Renvoie la référence vers le nœud parent (père) de `n` dans l\'arbre `a`.\n\n```psc\nparentNoeud ← pere(arbre, n)\n```\n> 💡 **Remarque :** Renvoie `nil` si `n` est la racine de l\'arbre ou si `n` est `nil`.',
-            signature: 'pere(a : ArbreBinaire, n : Noeud) : Noeud',
-            snippet: 'pere(${1:a}, ${2:n})',
-            methodSnippet: 'pere(${VAR}, ${1:n})',
-            category: 'Arbre Binaire',
-            targetType: ['arbin', 'arbrebinaire', 'noeud']
-        },
 
         // ═══════════ ABR — Arbres Binaires de Recherche ═══════════
         {
@@ -1236,28 +1215,6 @@ export const PSC_DEFINITIONS = {
             methodSnippet: 'suppressionABR(${VAR}, ${1:clé})',
             category: 'ABR',
             targetType: ['abr', 'arbin']
-        },
-        {
-            name: 'estabr',
-            arity: 1,
-            luaHelper: '__psc_abr_est',
-            description: 'Exercice 6 — Vérifie si un arbre binaire quelconque est un ABR valide (parcours infixe trié croissant).\n\n```psc\nSi estABR(monArbre) Alors :\n\técrire("Valide")\nfsi\n```',
-            signature: 'estABR(A : ArbreBinaire) : booléen',
-            snippet: 'estABR(${1:A})',
-            methodSnippet: 'estABR(${VAR})',
-            category: 'ABR',
-            targetType: ['abr', 'arbin', 'avl', 'noeud']
-        },
-        {
-            name: 'kemepluspetit',
-            arity: 2,
-            luaHelper: '__psc_abr_keme',
-            description: 'Exercice 7 — Renvoie la k-ième plus petite valeur de l\'ABR (k ≥ 1, parcours infixe).\n\n```psc\ntroisieme ← kemePlusPetit(abr, 3)\n```\n> ⚠️ **Précondition :** `1 ≤ k ≤ taille`. Renvoie `nil` si hors bornes.',
-            signature: 'kemePlusPetit(abr : ABR, k : entier) : valeur',
-            snippet: 'kemePlusPetit(${1:abr}, ${2:k})',
-            methodSnippet: 'kemePlusPetit(${VAR}, ${1:k})',
-            category: 'ABR',
-            targetType: ['abr', 'arbin', 'avl']
         },
         {
             name: 'hauteur',

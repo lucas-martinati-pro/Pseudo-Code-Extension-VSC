@@ -1125,16 +1125,6 @@ local function __psc_arbin_creer(v)
     return { _type = 'arbin', root = root }
 end
 
-local function __psc_arbin_vide(a)
-    if a == nil then
-        return { _type = 'arbin', root = nil }
-    end
-    if type(a) == 'table' and (a._type == 'arbin' or a._type == 'abr' or a._type == 'avl') then
-        return a.root == nil
-    end
-    return a == nil
-end
-
 local function __psc_arbin_racine(a)
     if a == nil then return nil end
     if type(a) == 'table' then
@@ -1180,19 +1170,6 @@ local function __psc_arbin_fd(a, n)
             return n.root and n.root.fd or nil
         end
         return n.fd
-    end
-    return nil
-end
-
-local function __psc_arbin_pere(a, n)
-    if n == nil then
-        if type(a) == 'table' then
-            return a.parent
-        end
-        return nil
-    end
-    if type(n) == 'table' then
-        return n.parent
     end
     return nil
 end
@@ -1281,7 +1258,6 @@ end
 local racine = __psc_arbin_racine
 local fg = __psc_arbin_fg
 local fd = __psc_arbin_fd
-local pere = __psc_arbin_pere
 local noeudvide = __psc_arbin_noeudvide
 local noeudVide = __psc_arbin_noeudvide
 local creerarb = __psc_arbin_creer
@@ -1291,8 +1267,6 @@ local adjfd = __psc_arbin_adjfd
 local chgarb = __psc_arbin_chgarb
 local supfg = __psc_arbin_supfg
 local supfd = __psc_arbin_supfd
-local arbrevide = __psc_arbin_vide
-local arbreVide = __psc_arbin_vide
 
 -- =================================================================================================================
 -- ABR — Arbres Binaires de Recherche (propriété BST : fg <= noeud <= fd)
@@ -1490,24 +1464,6 @@ function __psc_abr_est(a)
     end
     __psc_infixe(root)
     return ok
-end
-
-function __psc_abr_keme(a, k)
-    if k == nil or type(k) ~= 'number' or k < 1 then return nil end
-    local root = __psc_tree_root(a)
-    local count = 0
-    local found = nil
-    local done = false
-    local function __psc_infixe_k(n)
-        if n == nil or done then return end
-        __psc_infixe_k(n.fg)
-        if done then return end
-        count = count + 1
-        if count == k then found = n.val done = true return end
-        __psc_infixe_k(n.fd)
-    end
-    __psc_infixe_k(root)
-    return found
 end
 
 function __psc_hauteur_noeud(n)
@@ -1848,8 +1804,6 @@ creerABR = __psc_abr_creer
 rechercheABR = __psc_abr_recherche
 insertionABR = __psc_abr_insertion
 suppressionABR = __psc_abr_suppression
-estABR = __psc_abr_est
-kemePlusPetit = __psc_abr_keme
 hauteur = __psc_hauteur
 avlVide = __psc_avl_vide
 creerAVL = __psc_avl_creer

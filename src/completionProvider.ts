@@ -274,7 +274,7 @@ function analyzeDocument(document: vscode.TextDocument, cursorLine: number): Doc
             else if (/^\s*fichierOuvrir\s*\(/i.test(rhs) || /^\s*fichierCr[ée]+r\s*\(/i.test(rhs)) guessedType = 'fichier';
             else if (/^\s*(abrVide|creerABR|créerABR|insertionABR)\s*\(/i.test(rhs)) guessedType = 'abr';
             else if (/^\s*(avlVide|creerAVL|créerAVL|insertionAVL)\s*\(/i.test(rhs)) guessedType = 'avl';
-            else if (/^\s*(créerarb|creerarb|arbrevide)\s*\(/i.test(rhs)) guessedType = 'arbin';
+            else if (/^\s*(créerarb|creerarb)\s*\(/i.test(rhs)) guessedType = 'arbin';
             else if (/^\s*lire\s*\(/i.test(rhs)) guessedType = '';
             else if (/^"/.test(rhs) || /^\s*concat\s*\(/i.test(rhs)) guessedType = 'chaîne';
             else if (/^\d+$/.test(rhs)) guessedType = 'entier';

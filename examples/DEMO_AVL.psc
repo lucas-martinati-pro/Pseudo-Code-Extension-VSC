@@ -16,9 +16,7 @@ Début
     écrire("AVL après insertions 1..7 : ", avl)
     h ← hauteur(avl)
     écrire("hauteur AVL 7 noeuds (attendu 3) : ", h)
-    écrire("estABR(avl) : ", estABR(avl))
     écrire("estAVL(avl) : ", estAVL(avl))
-    écrire("k=4 : ", kemePlusPetit(avl, 4))
 
     // 2. Facteur d'équilibre en tout noeud dans [-1,1]
     r ← racine(avl)
@@ -36,7 +34,6 @@ Début
     écrire("avant rotation : ", t, " h=", hauteur(t))
     rotationDroite(t, racine(t))
     écrire("apres rotationDroite racine : ", t)
-    écrire("estABR apres rotation manuelle (peut être Faux, normal) : ", estABR(t))
 
     // 4. Double rotations
     t2 ← avlVide()

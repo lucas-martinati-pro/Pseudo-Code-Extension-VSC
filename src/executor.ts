@@ -500,17 +500,14 @@ export function transpileToLua(pscCode: string): string {
                 .replace(/\bcr[eé]er\s*arbre\b/giu, 'creerarb')
                 .replace(/\bcr[eé]er\s*abr\b/giu, 'creerabr')
                 .replace(/\bcr[eé]er\s*avl\b/giu, 'creeravl')
-                .replace(/\barbre\s*vide\b/giu, 'arbrevide')
                 .replace(/\babr\s*vide\b/giu, 'abrvide')
                 .replace(/\bavl\s*vide\b/giu, 'avlvide')
                 .replace(/\bnoeud\s*vide\b/giu, 'noeudvide')
-                .replace(/\bk[ée]me\s*plus\s*petit\b/giu, 'kemepluspetit')
                 .replace(/\bfacteur\s*[ée]quilibre\b/giu, 'facteurequilibre')
                 .replace(/\brotation\s*gauche\s*droite\b/giu, 'rotationgauchedroite')
                 .replace(/\brotation\s*droite\s*gauche\b/giu, 'rotationdroitegauche')
                 .replace(/\brotation\s*gauche\b/giu, 'rotationgauche')
                 .replace(/\brotation\s*droite\b/giu, 'rotationdroite')
-                .replace(/\best\s*abr\b/giu, 'estabr')
                 .replace(/\best\s*avl\b/giu, 'estavl');
 
             if (REGEX_FONCTION.test(trimmedLine)) {

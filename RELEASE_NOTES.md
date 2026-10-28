@@ -1,3 +1,15 @@
+# 🚀 Release v0.4.26 — PseudoCode Language Interpreter
+
+### 🧹 Nettoyage des Primitives
+- **Arbres Binaires :**
+  - Retrait des fonctions hors programme `arbrevide` et `pere` pour s'aligner strictement sur les primitives officielles du cours (`racine`, `val`, `fg`, `fd`, `noeudvide`, `créerarb`, `adjfg`, `adjfd`, `chgarb`, `supfg`, `supfd`).
+- **ABR :**
+  - Retrait des fonctions spécifiques d'exercices : `estABR` et `kemePlusPetit`.
+- **IntelliSense & Coloration :**
+  - Synchronisation de la grammaire TextMate (93 fonctions intégrées) et de l'autocomplétion.
+
+---
+
 # 🚀 Release v0.4.25 — PseudoCode Language Interpreter
 
 ### ✨ Nouveautés Majeures : Support complet des ABR et AVL
@@ -9,8 +21,6 @@
   - `rechercheABR(abr, clé)` : renvoie la traduction (`anglais`) ou `""` si absent — O(h).
   - `insertionABR(abr, v)` / `insertionABR(abr, mot, traduction)` : insertion BST (doublon → mise à jour).
   - `suppressionABR(abr, clé)` : feuille / 1 fils / 2 fils via successeur.
-  - `estABR(A)` (Ex. 6) : validité via infixe trié, accepte `arbin`/`abr`/`avl`.
-  - `kemePlusPetit(abr, k)` (Ex. 7) : k-ième plus petite valeur (k ≥ 1, `nil` si hors bornes).
 - **Primitives AVL :**
   - `avlVide()`, `creerAVL(v)` / `créerAVL(v)`, `insertionAVL`, `suppressionAVL` (insertion BST + remontée avec rotations O(1), garantie O(log n)).
   - `estAVL(A)` : BST + équilibré partout.
@@ -19,10 +29,10 @@
   - `rotationGauche / rotationDroite / rotationGaucheDroite / rotationDroiteGauche(a, n)` : réarrangements locaux O(1).
 - **Interpréteur & IntelliSense :**
   - Helpers Lua BST/AVL avec maintien des parents et hauteurs, `racine/fg/fd/val` compatibles `abr`/`avl`, affichage `Abr(...)`/`Avl(...)` avec décodage `français`.
-  - Constructeurs `abr(v)` / `avl(v)`, normalisations (`abr vide`, `kème plus petit`, `facteur équilibre`...), complétion par point et hover synchronisés, grammaire TextMate régénérée (97 fonctions, 36 types).
+  - Constructeurs `abr(v)` / `avl(v)`, normalisations (`abr vide`, `facteur équilibre`...), complétion par point et hover synchronisés, grammaire TextMate régénérée (95 fonctions, 36 types).
 
 ### 🧪 Tests & Démonstrations
-- Ajout de `examples/DEMO_ABR.psc` (lexique fr-ang, suppression, k-ième, dégénéré vs équilibré, `estABR` négatif) et `examples/DEMO_AVL.psc` (insertions triées 1..7 → `Avl(4(2(1,3),6(5,7)))` h=3, facteurs, rotations simples/doubles, suppressions rééquilibrées, lexique AVL).
+- Ajout de `examples/DEMO_ABR.psc` (lexique fr-ang, suppression, dégénéré vs équilibré) et `examples/DEMO_AVL.psc` (insertions triées 1..7 → `Avl(4(2(1,3),6(5,7)))` h=3, facteurs, rotations simples/doubles, suppressions rééquilibrées, lexique AVL).
 - Suite `npm test` : 7/7 fichiers validés (transpilation + `luac -p` + exécution Lua).
 
 ---
@@ -40,11 +50,9 @@
   - `val(a, n)` / `val(n)` : Renvoie la valeur associée au nœud `n` (compatible avec les listes et les arbres binaires).
   - `fg(a, n)` / `fg(n)` : Renvoie le fils gauche du nœud `n` dans l'arbre `a` (`nil` si absent).
   - `fd(a, n)` / `fd(n)` : Renvoie le fils droit du nœud `n` dans l'arbre `a` (`nil` si absent).
-  - `pere(a, n)` / `pere(n)` : Renvoie le parent (père) du nœud `n` (`nil` si racine).
   - `noeudvide(a, n)` / `noeudvide(n)` : Prédicat testant si un nœud est `nil` (supporte les arités 1 et 2 pour s'adapter à toutes les syntaxes de cours).
 - **Primitives de Construction, Mise à Jour & Destructeurs :**
   - `créerarb(v)` / `creerarb(v)` : Instancie un nouvel arbre binaire avec une racine contenant `v` (ou arbre vide si omis).
-  - `arbrevide()` / `arbreVide()` : Instancie un arbre binaire vide ou teste si un arbre est vide.
   - `adjfg(a, n, v)` : Adjonction en place d'un fils gauche avec valeur `v` au nœud `n`.
   - `adjfd(a, n, v)` : Adjonction en place d'un fils droit avec valeur `v` au nœud `n`.
   - `chgarb(a, n, v)` : Modification en place de la valeur du nœud `n` en lui affectant `v`.
