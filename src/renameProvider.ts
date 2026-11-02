@@ -1,21 +1,22 @@
 import * as vscode from 'vscode';
+import { isTypeOccurrence } from './typeContext';
+import { extractFunctionParams } from './utils';
 import { PSC_DEFINITIONS } from './definitions';
 import { isInCommentOrString } from './completionProvider';
 
 /**
  * Ensemble des mots réservés du langage Pseudo-Code
- * (mots-clés et types prédéfinis)
+ * (mots-clés structurels)
  */
 const RESERVED_WORDS = new Set<string>([
     ...PSC_DEFINITIONS.keywords.filter(k => k.type !== 'io').map(k => k.name.toLowerCase()),
-    ...PSC_DEFINITIONS.types.flatMap(t => t.aliases.map(a => a.toLowerCase())),
     // Variantes usuelles
     'si', 'alors', 'sinon', 'fsi', 'pour', 'chaque', 'dans', 'allant', 'de', 'à', 'faire', 'fpour',
     'tant', 'que', 'ftq', 'début', 'debut', 'fin', 'algorithme', 'fonction', 'procédure', 'procedure',
     'retourner', 'retourne', 'vrai', 'faux', 'nil', 'et', 'ou', 'non', 'mod', 'inout', 'soit',
-    'entier', 'réel', 'reel', 'booléen', 'booleen', 'chaîne', 'chaine', 'caractère', 'caractere',
-    'tableau', 'liste', 'pile', 'file', 'table', 'ensemble', 'fichier', 'arbin', 'noeud', 'abr', 'avl'
 ]);
+
+const BUILTIN_TYPES = new Set(PSC_DEFINITIONS.types.flatMap(t => t.aliases.map(a => a.toLowerCase())));
 
 const BUILTIN_FUNCTIONS = new Set([
     ...PSC_DEFINITIONS.functions.map(f => f.name.toLowerCase()),
@@ -49,6 +50,8 @@ export class PscRenameProvider implements vscode.RenameProvider {
         }
 
         if (RESERVED_WORDS.has(word.toLowerCase()) ||
+            (/^\s*Lexique\s*:?\s*$/iu.test(lineText)) ||
+            (BUILTIN_TYPES.has(word.toLowerCase()) && isTypeOccurrence(lineText, range.start.character)) ||
             (BUILTIN_FUNCTIONS.has(word.toLowerCase()) && isFunctionOccurrence(lineText, range.start.character, word.length))) {
             throw new Error(`Impossible de renommer "${word}" car c'est un mot-clé ou une primitive du langage.`);
         }
@@ -78,15 +81,16 @@ export class PscRenameProvider implements vscode.RenameProvider {
 
         const lineAtPos = document.lineAt(position.line).text;
         const textBeforePos = lineAtPos.substring(0, range.start.character).trimEnd();
-        const isFieldRename = textBeforePos.endsWith('.') || /=\s*<[^>]*$/u.test(textBeforePos);
-        const isFunctionRename = !isFieldRename && isFunctionOccurrence(lineAtPos, range.start.character, oldName.length);
+        const isTypeRename = isTypeOccurrence(lineAtPos, range.start.character);
+        const isFieldRename = !isTypeRename && (textBeforePos.endsWith('.') || /=\s*<[^>]*$/u.test(textBeforePos));
+        const isFunctionRename = !isTypeRename && !isFieldRename && isFunctionOccurrence(lineAtPos, range.start.character, oldName.length);
 
         const lineCount = document.lineCount;
         let funcStartLine = -1;
         let funcEndLine = -1;
         let isLocalToFunc = false;
 
-        if (!isFieldRename) {
+        if (!isFieldRename && !isTypeRename) {
             // Déterminer si la position courante est à l'intérieur d'une fonction
             for (let i = position.line; i >= 0; i--) {
                 const line = document.lineAt(i).text.trim();
@@ -117,8 +121,7 @@ export class PscRenameProvider implements vscode.RenameProvider {
                     // Paramètre de la fonction ?
                     const paramsMatch = /\((.*?)\)/.exec(funcDeclLine);
                     const paramsStr = paramsMatch ? paramsMatch[1] : '';
-                    const paramRegex = new RegExp(`\\b${oldName}\\b`, 'u');
-                    const isParam = paramRegex.test(paramsStr);
+                    const isParam = extractFunctionParams(paramsStr).some(p => p.name === oldName);
 
                     // Variable locale déclarée ou assignée dans la fonction ?
                     let isDeclaredLocally = false;
@@ -156,6 +159,10 @@ export class PscRenameProvider implements vscode.RenameProvider {
                         const isPrecededByDot = match.index > 0 && lineText[match.index - 1] === '.';
                         const inCompositeDef = /=\s*<[^>]*$/u.test(lineText.substring(0, match.index));
 
+                        const occurrenceIsType = isTypeOccurrence(lineText, match.index);
+                        if (/^\s*Lexique\s*:?\s*$/iu.test(lineText)) continue;
+                        if (occurrenceIsType !== isTypeRename) continue;
+
                         if (isFieldRename) {
                             // On ne renomme que les champs
                             if (isPrecededByDot || inCompositeDef) {
@@ -169,8 +176,8 @@ export class PscRenameProvider implements vscode.RenameProvider {
                             }
                         } else {
                             // On ne renomme pas les accès aux champs d'autres structures
-                            if (!isPrecededByDot && !inCompositeDef &&
-                                isFunctionOccurrence(lineText, match.index, oldName.length) === isFunctionRename) {
+                            if (isTypeRename || (!isPrecededByDot && !inCompositeDef &&
+                                isFunctionOccurrence(lineText, match.index, oldName.length) === isFunctionRename)) {
                                 const wordRange = new vscode.Range(
                                     i,
                                     match.index,

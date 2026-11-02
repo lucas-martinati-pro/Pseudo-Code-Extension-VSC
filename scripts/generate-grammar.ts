@@ -77,24 +77,35 @@ if (repository['support-functions']) {
     repository['support-functions'].match = `(?i)\\b(${allFunctions.join('|')})\\b(?=\\s*\\()`;
 }
 
-// 4. Types et modificateurs
-if (repository['storage']) {
-    const patterns = repository['storage'].patterns;
-
-    // Mettre à jour le pattern des modificateurs (Lexique, InOut, etc.)
-    const modifierPattern = patterns.find((p: any) => p.name === 'storage.modifier');
-    if (modifierPattern) {
-        modifierPattern.match = `(?i)\\b(${[...modifierKeywords, 'Lexique'].join('|')})\\b`;
-    }
-
-    // Mettre à jour le pattern des types de base (sans pile/file)
-    const typePatternIndex = patterns.findIndex((p: any) =>
-        p.name === 'storage.type' && p.match && p.match.includes('entier')
-    );
-    if (typePatternIndex !== -1) {
-        patterns[typePatternIndex].match = `(?i)\\b(${baseTypes.join('|')}|listesym|InOut)\\b(?!\\s*\\()`;
-    }
-}
+// 4. Les types ne sont colorés que dans les annotations et les alias.
+repository['type-content'] = {
+    patterns: [
+        { begin: '\\(', end: '\\)|$', patterns: [{ include: '#type-content' }] },
+        { begin: '\\[', end: '\\]|$', patterns: [{ include: '#type-content' }] },
+        { name: 'storage.type', match: `${IDENT_START}${IDENT_CHAR}*` }
+    ]
+};
+repository['storage'] = {
+    patterns: [
+        { name: 'storage.modifier', match: `(?i)\\b(${modifierKeywords.join('|')})\\b` },
+        { name: 'storage.modifier', match: '(?i)^\\s*Lexique\\s*:?\\s*$' },
+        {
+            begin: `(?i)^\\s*(?:Soit\\s+)?(${IDENT_START}${IDENT_CHAR}*)\\s*=\\s*(?=${IDENT_START})`,
+            beginCaptures: { '1': { name: 'entity.name.type' } },
+            end: '$',
+            patterns: [{ include: '#type-content' }]
+        },
+        {
+            match: `(?i)^\\s*(?:Soit\\s+)?(${IDENT_START}${IDENT_CHAR}*)\\s*(?==)`,
+            captures: { '1': { name: 'entity.name.type' } }
+        },
+        {
+            begin: `(?<=:)\\s*(?=${IDENT_START})`,
+            end: '(?=[,)>]|$)',
+            patterns: [{ include: '#type-content' }]
+        }
+    ]
+};
 
 // 5. Constantes (Booléens)
 if (repository['constants']) {

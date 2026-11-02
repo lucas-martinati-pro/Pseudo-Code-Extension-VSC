@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { isTypeOccurrence } from './typeContext';
 import { DiagnosticTypes } from './diagnosticTypes';
 import { KNOWN_IDENTIFIERS_LOWER, KEYWORDS, PATTERNS, BUILTIN_FUNCTION_ARITY } from './constants';
 import { cleanLineFromComments, maskStrings, maskFieldAccess, smartSplitArgs, findMatchingParen, extractFunctionParams, extractPourLoopVar, parseCompositeFields } from './utils';
@@ -15,9 +16,9 @@ const REGEX_IDENTIFIER_EXTRACT = /^[\p{L}_][\p{L}0-9_]*/u;
 const REGEX_WHITESPACE = /\s/;
 // Les noms de fonctions ne sont réservés que lorsqu'ils sont suivis de parenthèses.
 const RESERVED_IDENTIFIERS_LOWER = new Set([
-    ...KEYWORDS.CONTROL, ...KEYWORDS.BLOCKS, ...KEYWORDS.TYPES,
+    ...KEYWORDS.CONTROL, ...KEYWORDS.BLOCKS,
     ...KEYWORDS.BOOLEAN, ...KEYWORDS.OPERATORS, ...KEYWORDS.MODIFIERS,
-    'lexique', 'fin_ligne'
+    'fin_ligne'
 ].map(name => name.toLowerCase()));
 
 const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
@@ -128,7 +129,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const trimmedText = nonCommentText.text.trim();
         inBlockComment = nonCommentText.inBlockComment;
 
-        if (trimmedText === '' || /^\s*Algorithme\b/i.test(trimmedText) || /^\s*Lexique\b/i.test(trimmedText)) continue;
+        if (trimmedText === '' || /^\s*Algorithme\b/i.test(trimmedText) || REGEX_LEXIQUE_LINE.test(trimmedText)) continue;
 
         // Ignorer les déclarations de types composites et types alias
         if (PATTERNS.COMPOSITE_TYPE.test(trimmedText) || /^\s*(?:Soit\s+)?[\p{L}_][\p{L}0-9_]*\s*=\s*(?!<)/iu.test(trimmedText)) continue;
@@ -323,9 +324,9 @@ function checkVariablesInExpression(
         const lowerVar = variable.toLowerCase();
 
         const isFunctionCall = /^\s*\(/.test(textToCheck.slice(indexInExpression + variable.length));
-        if (RESERVED_IDENTIFIERS_LOWER.has(lowerVar) ||
-            (isFunctionCall && (KNOWN_IDENTIFIERS_LOWER.has(lowerVar) || declaredFunctions.has(variable))) ||
-            declaredCompositeTypes.has(lowerVar) ||
+        if (isTypeOccurrence(expression, indexInExpression) ||
+            RESERVED_IDENTIFIERS_LOWER.has(lowerVar) ||
+            (isFunctionCall && (KNOWN_IDENTIFIERS_LOWER.has(lowerVar) || declaredFunctions.has(variable) || declaredCompositeTypes.has(lowerVar))) ||
             REGEX_NUMBER.test(variable)) {
             continue;
         }

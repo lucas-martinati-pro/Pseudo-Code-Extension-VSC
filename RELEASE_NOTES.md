@@ -1,3 +1,11 @@
+# 🚀 Release v0.4.29 — PseudoCode Language Interpreter
+
+- **Noms de variables :** les noms de types intégrés, composites et alias (`chaîne`, `entier`, `Lexique`…) peuvent être utilisés comme noms de variables.
+- **Renommage F2 :** le renommage distingue les variables des types homonymes et préserve leurs définitions et annotations.
+- **Linter et coloration :** distinction des usages comme variable ou comme type ; les affectations à une variable nommée `Lexique` sont désormais analysées.
+
+---
+
 # 🚀 Release v0.4.28 — PseudoCode Language Interpreter
 
 - **Variables et fonctions :** une variable peut porter le même nom qu'une fonction ; le linter, la coloration et le renommage F2 distinguent les variables des appels.

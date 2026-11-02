@@ -80,3 +80,12 @@ assert.deepStrictEqual(diagnose('Fonction f(x : chaîne) : chaîne\nDébut\nreto
 assert.strictEqual(diagnose(numberFunction + 'Point = <nom : chaîne>\nDébut\np : Point\nécrire(nombre(p.nom))\nFin').length, 1);
 assert.strictEqual(diagnose(numberFunction + 'Début\nt : tableau chaîne[0..3]\nécrire(nombre(t[0]))\nFin').length, 1);
 console.log('✓ Types des arguments, signatures modifiées, alias, portées et appels imbriqués');
+
+for (const name of ['chaîne', 'entier', 'Lexique', 'MotTraduction']) {
+    const types = 'MotTraduction = <mot : chaîne>\nLexique = arbin(MotTraduction)\n';
+    assert.deepStrictEqual(diagnose(types + `Début\n${name} ← 1\nécrire(${name})\nFin`), []);
+    assert.strictEqual(diagnose(types + `Début\nécrire(${name})\nFin`).length, 1, `${name} doit être initialisé comme une variable`);
+    assert.deepStrictEqual(diagnose(types + `Fonction test(${name} : entier) : entier\nDébut\nretourner ${name}\nFin`), []);
+}
+assert.strictEqual(diagnose('Début\nLexique ← absent\nFin').length, 1, 'Ne pas ignorer les affectations à Lexique');
+console.log('✓ Variables homonymes de types et du bloc Lexique');

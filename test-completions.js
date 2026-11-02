@@ -444,3 +444,30 @@ console.log('===============================================================');
     assert.throws(() => rename.provideRenameEdits(doc, new mockVscode.Position(1, 1), '1taille', {}), /valide/);
     console.log('  ✓ Renommage des variables homonymes de fonctions, sans modifier les appels');
 }
+
+// Les annotations et définitions de types ne sont pas des références à la variable.
+{
+    const rename = new PscRenameProvider();
+    for (const name of ['chaîne', 'entier', 'Lexique', 'MotTraduction']) {
+        const lines = [
+            'MotTraduction = <mot : chaîne>',
+            'Lexique = arbin(MotTraduction)',
+            `Fonction exemple(${name} : ${name}) : ${name}`,
+            'Début',
+            `    écrire(${name})`,
+            'Fin'
+        ];
+        const doc = createMockDocument(lines, 30);
+        const pos = new mockVscode.Position(2, lines[2].indexOf('(') + 1);
+        assert.strictEqual(rename.prepareRename(doc, pos, {}).placeholder, name);
+        assert.strictEqual(rename.provideRenameEdits(doc, pos, 'valeur', {}).edits.length, 2, name);
+        const simpleDoc = createMockDocument(['Début', 'valeur ← 1', 'écrire(valeur)', 'Fin'], 31);
+        assert.strictEqual(rename.provideRenameEdits(simpleDoc, new mockVscode.Position(1, 1), name, {}).edits.length, 2);
+    }
+    const doc = createMockDocument(['Lexique = arbin(chaîne)', 'Début', 'Lexique ← 1', 'écrire(Lexique)', 'x : Lexique', 'Fin'], 32);
+    assert.strictEqual(rename.provideRenameEdits(doc, new mockVscode.Position(2, 1), 'valeur', {}).edits.length, 2);
+    assert.strictEqual(rename.provideRenameEdits(doc, new mockVscode.Position(0, 1), 'Arbre', {}).edits.length, 2, 'Renommer un alias préserve la variable homonyme');
+    const annotation = createMockDocument(['x : entier'], 33);
+    assert.throws(() => rename.prepareRename(annotation, new mockVscode.Position(0, 5), {}), /primitive/);
+    console.log('  ✓ Renommage des variables homonymes de types sans modifier les annotations');
+}

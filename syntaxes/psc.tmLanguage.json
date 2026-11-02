@@ -112,15 +112,28 @@
       "patterns": [
         {
           "name": "storage.modifier",
-          "match": "(?i)\\b(inout|Lexique)\\b"
+          "match": "(?i)\\b(inout)\\b"
         },
         {
-          "name": "storage.type",
-          "match": "(?i)(?<=:|de)\\s*\\b(pile|file)\\b"
+          "name": "storage.modifier",
+          "match": "(?i)^\\s*Lexique\\s*:?\\s*$"
         },
         {
-          "name": "entity.name.type.declaration",
-          "match": "^\\s*([A-Z\\u00C0-\\u024F][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s*=",
+          "begin": "(?i)^\\s*(?:Soit\\s+)?([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s*=\\s*(?=[a-zA-Z\\u00C0-\\u024F_])",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.type"
+            }
+          },
+          "end": "$",
+          "patterns": [
+            {
+              "include": "#type-content"
+            }
+          ]
+        },
+        {
+          "match": "(?i)^\\s*(?:Soit\\s+)?([a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*)\\s*(?==)",
           "captures": {
             "1": {
               "name": "entity.name.type"
@@ -128,12 +141,13 @@
           }
         },
         {
-          "name": "storage.type",
-          "match": "(?i)\\b(entier|réel|reel|booléen|booleen|chaîne|chaine|caractère|caractere|tableau|liste|listesym|table|ensemble|fichier|arbin|arbrebinaire|arbrebinaireentier|arbrebinairechaine|arbrebinairechaîne|arbrebinairebooleen|arbrebinairebooléen|arbrebinairereel|arbrebinaireréel|noeud|nœud|abr|arbr|arbrebinairecherche|abrchaine|abrchaîne|abrentier|abrentiers|avl|arbreavl|avltree|listesym|InOut)\\b(?!\\s*\\()"
-        },
-        {
-          "name": "storage.type",
-          "match": "(?i)(?<=:)\\s*([A-Z\\u00C0-\\u024F][a-zA-Z0-9\\u00C0-\\u024F_]*)\\b(?!\\s*\\()"
+          "begin": "(?<=:)\\s*(?=[a-zA-Z\\u00C0-\\u024F_])",
+          "end": "(?=[,)>]|$)",
+          "patterns": [
+            {
+              "include": "#type-content"
+            }
+          ]
         }
       ]
     },
@@ -225,6 +239,32 @@
     "variables": {
       "name": "variable.other",
       "match": "(?i)\\b(?!(?:soit|si|alors|sinon|fsi|ftq|pour|chaque|dans|allant|de|à|faire|fpour|décroissant|retourner|retourne|début|fin|algorithme|fonction|et|ou|non|mod|ftant|Fin|Tant(?:\\s+que)|Sinon(?:\\s+si))\\b)[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*\\b"
+    },
+    "type-content": {
+      "patterns": [
+        {
+          "begin": "\\(",
+          "end": "\\)|$",
+          "patterns": [
+            {
+              "include": "#type-content"
+            }
+          ]
+        },
+        {
+          "begin": "\\[",
+          "end": "\\]|$",
+          "patterns": [
+            {
+              "include": "#type-content"
+            }
+          ]
+        },
+        {
+          "name": "storage.type",
+          "match": "[a-zA-Z\\u00C0-\\u024F_][a-zA-Z0-9\\u00C0-\\u024F_]*"
+        }
+      ]
     }
   }
 }
