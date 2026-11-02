@@ -4,20 +4,27 @@ import { isInCommentOrString } from './completionProvider';
 
 /**
  * Ensemble des mots réservés du langage Pseudo-Code
- * (mots-clés, fonctions intégrées, types prédéfinis)
+ * (mots-clés et types prédéfinis)
  */
 const RESERVED_WORDS = new Set<string>([
-    ...PSC_DEFINITIONS.keywords.map(k => k.name.toLowerCase()),
-    ...PSC_DEFINITIONS.functions.map(f => f.name.toLowerCase()),
+    ...PSC_DEFINITIONS.keywords.filter(k => k.type !== 'io').map(k => k.name.toLowerCase()),
     ...PSC_DEFINITIONS.types.flatMap(t => t.aliases.map(a => a.toLowerCase())),
     // Variantes usuelles
     'si', 'alors', 'sinon', 'fsi', 'pour', 'chaque', 'dans', 'allant', 'de', 'à', 'faire', 'fpour',
     'tant', 'que', 'ftq', 'début', 'debut', 'fin', 'algorithme', 'fonction', 'procédure', 'procedure',
     'retourner', 'retourne', 'vrai', 'faux', 'nil', 'et', 'ou', 'non', 'mod', 'inout', 'soit',
     'entier', 'réel', 'reel', 'booléen', 'booleen', 'chaîne', 'chaine', 'caractère', 'caractere',
-    'tableau', 'liste', 'pile', 'file', 'table', 'ensemble', 'fichier', 'arbin', 'noeud', 'abr', 'avl',
-    'écrire', 'ecrire', 'lire'
+    'tableau', 'liste', 'pile', 'file', 'table', 'ensemble', 'fichier', 'arbin', 'noeud', 'abr', 'avl'
 ]);
+
+const BUILTIN_FUNCTIONS = new Set([
+    ...PSC_DEFINITIONS.functions.map(f => f.name.toLowerCase()),
+    ...PSC_DEFINITIONS.keywords.filter(k => k.type === 'io').map(k => k.name.toLowerCase())
+]);
+
+function isFunctionOccurrence(line: string, start: number, length: number): boolean {
+    return /^\s*\(/.test(line.slice(start + length));
+}
 
 /**
  * Provider de renommage de symbole pour le Pseudo-Code (F2 / Clic droit -> Renommer le symbole)
@@ -41,7 +48,8 @@ export class PscRenameProvider implements vscode.RenameProvider {
             throw new Error("Impossible de renommer un élément dans un commentaire ou une chaîne de caractères.");
         }
 
-        if (RESERVED_WORDS.has(word.toLowerCase())) {
+        if (RESERVED_WORDS.has(word.toLowerCase()) ||
+            (BUILTIN_FUNCTIONS.has(word.toLowerCase()) && isFunctionOccurrence(lineText, range.start.character, word.length))) {
             throw new Error(`Impossible de renommer "${word}" car c'est un mot-clé ou une primitive du langage.`);
         }
 
@@ -71,6 +79,7 @@ export class PscRenameProvider implements vscode.RenameProvider {
         const lineAtPos = document.lineAt(position.line).text;
         const textBeforePos = lineAtPos.substring(0, range.start.character).trimEnd();
         const isFieldRename = textBeforePos.endsWith('.') || /=\s*<[^>]*$/u.test(textBeforePos);
+        const isFunctionRename = !isFieldRename && isFunctionOccurrence(lineAtPos, range.start.character, oldName.length);
 
         const lineCount = document.lineCount;
         let funcStartLine = -1;
@@ -102,7 +111,7 @@ export class PscRenameProvider implements vscode.RenameProvider {
 
                 const funcDeclLine = document.lineAt(funcStartLine).text;
                 const funcNameMatch = /^\s*(?:Fonction|Procédure)\s+([\p{L}_][\p{L}0-9_]*)/iu.exec(funcDeclLine);
-                const isFunctionName = funcNameMatch && funcNameMatch[1] === oldName;
+                const isFunctionName = isFunctionRename && funcNameMatch && funcNameMatch[1] === oldName;
 
                 if (!isFunctionName) {
                     // Paramètre de la fonction ?
@@ -160,7 +169,8 @@ export class PscRenameProvider implements vscode.RenameProvider {
                             }
                         } else {
                             // On ne renomme pas les accès aux champs d'autres structures
-                            if (!isPrecededByDot && !inCompositeDef) {
+                            if (!isPrecededByDot && !inCompositeDef &&
+                                isFunctionOccurrence(lineText, match.index, oldName.length) === isFunctionRename) {
                                 const wordRange = new vscode.Range(
                                     i,
                                     match.index,

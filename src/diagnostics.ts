@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { KNOWN_IDENTIFIERS_LOWER, PATTERNS, BUILTIN_FUNCTION_ARITY } from './constants';
+import { KNOWN_IDENTIFIERS_LOWER, KEYWORDS, PATTERNS, BUILTIN_FUNCTION_ARITY } from './constants';
 import { cleanLineFromComments, maskStrings, maskFieldAccess, smartSplitArgs, findMatchingParen, extractFunctionParams, extractPourLoopVar } from './utils';
 import { BlockDefinition, findOpeningBlock, findClosingBlock } from './blocks';
 
@@ -12,6 +12,12 @@ const REGEX_IDENT_CHAR = /[\p{L}_]/u;
 const REGEX_IDENT_CHAR_FULL = /[\p{L}0-9_]/u;
 const REGEX_IDENTIFIER_EXTRACT = /^[\p{L}_][\p{L}0-9_]*/u;
 const REGEX_WHITESPACE = /\s/;
+// Les noms de fonctions ne sont réservés que lorsqu'ils sont suivis de parenthèses.
+const RESERVED_IDENTIFIERS_LOWER = new Set([
+    ...KEYWORDS.CONTROL, ...KEYWORDS.BLOCKS, ...KEYWORDS.TYPES,
+    ...KEYWORDS.BOOLEAN, ...KEYWORDS.OPERATORS, ...KEYWORDS.MODIFIERS,
+    'lexique', 'fin_ligne'
+].map(name => name.toLowerCase()));
 
 const REGEX_LEXIQUE_LINE = /^\s*Lexique\s*:?\s*$/i;
 const REGEX_VAR_DECL_IN_LEXIQUE = /^\s*([\p{L}_][\p{L}0-9_]*(?:\s*,\s*[\p{L}_][\p{L}0-9_]*)*)\s*:\s*.+/iu;
@@ -279,9 +285,9 @@ function checkVariablesInExpression(
         const indexInExpression = match.index;
         const lowerVar = variable.toLowerCase();
 
-        // OPTIMISÉ: Vérifications avec Sets pré-calculés
-        if (KNOWN_IDENTIFIERS_LOWER.has(lowerVar) ||
-            declaredFunctions.has(variable) ||
+        const isFunctionCall = /^\s*\(/.test(textToCheck.slice(indexInExpression + variable.length));
+        if (RESERVED_IDENTIFIERS_LOWER.has(lowerVar) ||
+            (isFunctionCall && (KNOWN_IDENTIFIERS_LOWER.has(lowerVar) || declaredFunctions.has(variable))) ||
             declaredCompositeTypes.has(lowerVar) ||
             REGEX_NUMBER.test(variable)) {
             continue;

@@ -417,3 +417,30 @@ console.log('===============================================================');
 console.log('  TOUS LES TESTS DU COMPLETION PROVIDER ET RENAME ONT RÉUSSI !');
 console.log('===============================================================');
 
+
+// Renommer vers/depuis un nom de fonction sans modifier ses appels.
+{
+    const rename = new PscRenameProvider();
+    for (const name of ['longueur', 'racine', 'lire', 'calcul']) {
+        const lines = [
+            'Fonction calcul(x : entier) : entier',
+            'Début',
+            `    ${name} ← 3`,
+            `    écrire(${name})`,
+            `    retourner ${name}("abc")`,
+            'Fin'
+        ];
+        const doc = createMockDocument(lines, 20);
+        const pos = new mockVscode.Position(2, 5);
+        assert.strictEqual(rename.prepareRename(doc, pos, {}).placeholder, name);
+        const edits = rename.provideRenameEdits(doc, pos, 'taille', {});
+        assert.strictEqual(edits.edits.length, 2, `Renommer ${name} doit préserver les appels et déclarations de fonctions`);
+        const plainDoc = createMockDocument(['Début', 'taille ← 3', 'écrire(taille)', 'Fin'], 21);
+        assert.strictEqual(rename.provideRenameEdits(plainDoc, new mockVscode.Position(1, 1), name, {}).edits.length, 2);
+    }
+    const doc = createMockDocument(['Début', 'taille ← longueur("abc")', 'Fin'], 22);
+    assert.throws(() => rename.prepareRename(doc, new mockVscode.Position(1, 12), {}), /primitive/);
+    assert.throws(() => rename.provideRenameEdits(doc, new mockVscode.Position(1, 1), 'Si', {}), /réservé/);
+    assert.throws(() => rename.provideRenameEdits(doc, new mockVscode.Position(1, 1), '1taille', {}), /valide/);
+    console.log('  ✓ Renommage des variables homonymes de fonctions, sans modifier les appels');
+}

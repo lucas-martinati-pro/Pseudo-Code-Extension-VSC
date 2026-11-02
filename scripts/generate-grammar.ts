@@ -74,7 +74,7 @@ if (repository['logical-operators']) {
 // 3. Fonctions intégrées + I/O (écrire, lire)
 if (repository['support-functions']) {
     const allFunctions = [...supportFunctions, ...ioKeywords];
-    repository['support-functions'].match = `(?i)\\b(${allFunctions.join('|')})\\b`;
+    repository['support-functions'].match = `(?i)\\b(${allFunctions.join('|')})\\b(?=\\s*\\()`;
 }
 
 // 4. Types et modificateurs
