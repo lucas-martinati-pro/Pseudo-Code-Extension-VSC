@@ -1,3 +1,12 @@
+# 🚀 Release v0.4.28 — PseudoCode Language Interpreter
+
+- **Variables et fonctions :** une variable peut porter le même nom qu'une fonction ; le linter, la coloration et le renommage F2 distinguent les variables des appels.
+- **Renommage :** renommer une variable préserve les appels à la fonction homonyme.
+- **Vérification des appels :** le linter contrôle le nombre et les types connus des arguments des fonctions utilisateur, y compris les appels imbriqués. Une permutation de paramètres de types différents signale désormais les appels incompatibles.
+- **Types :** prise en compte des paramètres, déclarations, valeurs simples, retours de fonctions et alias de types, avec des messages indiquant le type attendu et le type fourni.
+
+---
+
 # 🚀 Release v0.4.27 — PseudoCode Language Interpreter
 
 ### 🎯 Correction & Amélioration de l'Autocomplétion (Dot-completion)

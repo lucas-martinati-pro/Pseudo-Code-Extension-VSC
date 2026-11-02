@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
+import { DiagnosticTypes } from './diagnosticTypes';
 import { KNOWN_IDENTIFIERS_LOWER, KEYWORDS, PATTERNS, BUILTIN_FUNCTION_ARITY } from './constants';
-import { cleanLineFromComments, maskStrings, maskFieldAccess, smartSplitArgs, findMatchingParen, extractFunctionParams, extractPourLoopVar } from './utils';
+import { cleanLineFromComments, maskStrings, maskFieldAccess, smartSplitArgs, findMatchingParen, extractFunctionParams, extractPourLoopVar, parseCompositeFields } from './utils';
 import { BlockDefinition, findOpeningBlock, findClosingBlock } from './blocks';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -41,6 +42,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
     const scopeStack: Set<string>[] = [new Set()];
 
     const declaredFunctions = new Set<string>();
+    const types = new DiagnosticTypes();
     const declaredCompositeTypes = new Set<string>();
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -48,16 +50,25 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
     // ═══════════════════════════════════════════════════════════════════════════
     const lineCount = doc.lineCount;
     let inLexiqueBlock = false;
+    let inCollectionComment = false;
 
     for (let i = 0; i < lineCount; i++) {
         const lineText = doc.lineAt(i).text;
-        const trimmed = lineText.trim();
+        const cleaned = cleanLineFromComments(lineText, inCollectionComment);
+        inCollectionComment = cleaned.inBlockComment;
+        const trimmed = cleaned.text.trim();
         if (!trimmed) continue;
 
         // Détection fonction (regex pré-compilée)
         const funcMatch = PATTERNS.FUNCTION_DECLARATION.exec(trimmed);
         if (funcMatch) {
             declaredFunctions.add(funcMatch[1]);
+            const open = trimmed.indexOf('(');
+            const close = findMatchingParen(trimmed, open);
+            types.functions.set(funcMatch[1], {
+                params: extractFunctionParams(trimmed.slice(open + 1, close)),
+                returnType: trimmed.slice(close + 1).replace(/^\s*:\s*/, '').trim()
+            });
             inLexiqueBlock = false;
             continue;
         }
@@ -66,6 +77,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const typeMatch = PATTERNS.COMPOSITE_TYPE.exec(trimmed);
         if (typeMatch) {
             declaredCompositeTypes.add(typeMatch[1].toLowerCase());
+            types.composites.set(typeMatch[1].toLowerCase(), parseCompositeFields(typeMatch[2]));
             continue;
         }
 
@@ -73,6 +85,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         const typeAliasMatch = /^\s*(?:Soit\s+)?([\p{L}_][\p{L}0-9_]*)\s*=\s*(?!<)/iu.exec(trimmed);
         if (typeAliasMatch) {
             declaredCompositeTypes.add(typeAliasMatch[1].toLowerCase());
+            types.aliases.set(typeAliasMatch[1].toLowerCase(), trimmed.slice(typeAliasMatch[0].length).trim());
             continue;
         }
 
@@ -94,6 +107,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
                     for (const v of varNames) {
                         if (v) {
                             scopeStack[0].add(v); // Ajouter au scope global
+                            types.scopes[0].set(v, trimmed.slice(trimmed.indexOf(':') + 1).trim());
                         }
                     }
                 }
@@ -106,6 +120,7 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
     // ═══════════════════════════════════════════════════════════════════════════
     let inBlockComment = false;
     const blockStack: BlockInfo[] = [];
+    let functionScopeDepth: number | undefined;
 
     for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
         const line = doc.lineAt(lineIndex);
@@ -193,18 +208,23 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
         }
 
         // ─── Gestion des portées (scope) ───
+        if (funcMatch) functionScopeDepth = scopeStack.length;
         if (openingBlock || funcMatch || pourVar) {
             const newScope = new Set<string>();
+            const newTypes = new Map<string, string>();
             if (funcMatch) {
                 const params = extractFunctionParams(funcMatch[2]);
                 for (const p of params) {
                     newScope.add(p.name);
+                    newTypes.set(p.name, p.type);
                 }
             }
             if (pourVar) {
                 newScope.add(pourVar);
+                newTypes.set(pourVar, /\bchaque\b/i.test(processedText) ? '' : 'entier');
             }
             scopeStack.push(newScope);
+            types.scopes.push(newTypes);
         }
 
         const declarationMatch = PATTERNS.VARIABLE_DECLARATION.exec(processedText);
@@ -220,27 +240,44 @@ export function refreshDiagnostics(doc: vscode.TextDocument, collection: vscode.
             const currentScope = scopeStack[scopeStack.length - 1];
             for (const v of varNames) {
                 const trimmed = v.trim();
-                if (trimmed) currentScope.add(trimmed);
+                if (trimmed) {
+                    currentScope.add(trimmed);
+                    types.scopes[types.scopes.length - 1].set(trimmed, processedText.slice(processedText.indexOf(':') + 1).trim());
+                }
             }
         } else if (assignMatch) {
             const lhsText = assignMatch[1].trim();
             const rhsText = assignMatch[2].trim();
             checkVariablesInExpression(rhsText, scopeStack, declaredFunctions, declaredCompositeTypes, line, diagnostics);
-            checkFunctionCallsInExpression(rhsText, declaredFunctions, declaredCompositeTypes, line, diagnostics);
+            checkFunctionCallsInExpression(rhsText, declaredFunctions, declaredCompositeTypes, line, diagnostics, types);
 
             const lhsVarMatch = REGEX_IDENTIFIER_START.exec(lhsText);
             if (lhsVarMatch) {
                 scopeStack[scopeStack.length - 1].add(lhsVarMatch[1]);
+                if (lhsText === lhsVarMatch[1]) {
+                    const currentTypes = types.scopes[types.scopes.length - 1];
+                    const knownType = types.infer(lhsText);
+                    currentTypes.set(lhsVarMatch[1], knownType || types.infer(rhsText) || '');
+                }
                 const lhsIndexVars = lhsText.substring(lhsVarMatch[0].length);
                 checkVariablesInExpression(lhsIndexVars, scopeStack, declaredFunctions, declaredCompositeTypes, line, diagnostics);
             }
         } else {
             checkVariablesInExpression(trimmedText, scopeStack, declaredFunctions, declaredCompositeTypes, line, diagnostics);
-            checkFunctionCallsInExpression(trimmedText, declaredFunctions, declaredCompositeTypes, line, diagnostics);
+            if (!funcMatch) checkFunctionCallsInExpression(trimmedText, declaredFunctions, declaredCompositeTypes, line, diagnostics, types);
         }
 
         if (PATTERNS.CLOSING_KEYWORDS.test(trimmedText) && scopeStack.length > 1) {
             scopeStack.pop();
+            types.scopes.pop();
+            // Début et la signature ouvrent chacun une portée ; Fin ferme les deux.
+            if (/^Fin\s*$/iu.test(trimmedText) && functionScopeDepth !== undefined) {
+                while (scopeStack.length > functionScopeDepth) {
+                    scopeStack.pop();
+                    types.scopes.pop();
+                }
+                functionScopeDepth = undefined;
+            }
         }
     }
 
@@ -319,7 +356,8 @@ function checkFunctionCallsInExpression(
     declaredFunctions: Set<string>,
     declaredCompositeTypes: Set<string>,
     line: vscode.TextLine,
-    diagnostics: vscode.Diagnostic[]
+    diagnostics: vscode.Diagnostic[],
+    types: DiagnosticTypes
 ): void {
     let masked = maskStrings(expression);
     masked = maskFieldAccess(masked);
@@ -361,7 +399,25 @@ function checkFunctionCallsInExpression(
             const arity = args.length;
             const lower = funcName.toLowerCase();
 
-            if (Object.prototype.hasOwnProperty.call(BUILTIN_FUNCTION_ARITY, lower)) {
+            const signature = types.functions.get(funcName);
+            if (signature) {
+                const range = new vscode.Range(line.lineNumber, expressionOffsetInLine + i,
+                    line.lineNumber, expressionOffsetInLine + i + funcName.length);
+                if (arity !== signature.params.length) {
+                    diagnostics.push(new vscode.Diagnostic(range,
+                        `La fonction '${funcName}' attend ${signature.params.length} argument(s), mais ${arity} fourni(s).`,
+                        vscode.DiagnosticSeverity.Error));
+                }
+                for (let argIndex = 0; argIndex < Math.min(arity, signature.params.length); argIndex++) {
+                    const param = signature.params[argIndex];
+                    const actual = types.infer(args[argIndex]);
+                    if (actual && param.type && !types.compatible(actual, param.type)) {
+                        diagnostics.push(new vscode.Diagnostic(range,
+                            `Argument ${argIndex + 1} de '${funcName}' : le paramètre '${param.name}' attend le type '${param.type}', mais le type '${actual}' est fourni.`,
+                            vscode.DiagnosticSeverity.Error));
+                    }
+                }
+            } else if (Object.prototype.hasOwnProperty.call(BUILTIN_FUNCTION_ARITY, lower)) {
                 const expected = BUILTIN_FUNCTION_ARITY[lower];
                 const isValid = Array.isArray(expected) ? expected.includes(arity) : expected === arity;
                 if (!isValid) {
@@ -384,7 +440,8 @@ function checkFunctionCallsInExpression(
                 ));
             }
 
-            i = closeIdx + 1;
+            // Parcourir aussi les appels imbriqués dans les arguments.
+            i = j + 1;
             continue;
         }
 
